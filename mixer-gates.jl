@@ -61,3 +61,58 @@ Qaintessent.sparse_matrix(g::RNearbyValuesMixerGate) = sparse(matrix(g))
 # wires
 # TODO: should be d in the one-hot case, 1 for qudit case
 Qaintessent.num_wires(g::RNearbyValuesMixerGate)::Int = g.d[]
+
+"""
+    Parity single-qudit ring mixer gate, which acts on a single qudit
+
+``U_{\\text{parity}}(\\beta) = U_{\\text{last}}(\\beta) U_{\\text{even}}(\\beta) U_{\\text{odd}}(\\beta)``
+``U_{\\text{odd}}(\\beta) = \\prod_{a~\\text{odd}, a \\neq d} e^{-i \\beta (X_a X_{a+1} + Y_a Y_{a+1})}``
+``U_{\\text{even}}(\\beta) = \\prod_{a~\\text{even}} e^{-i \\beta (X_a X_{a+1} + Y_a Y_{a+1})}``
+``U_{\\text{last}}(\\beta) = e^{-i \\beta (X_d X_1 + Y_d Y_1)} ~\\text{if}~ d ~\\text{is odd,}~ I ~\\text{otherwise.}``
+
+Reference:\n
+    Stuart Hadfield, Zhihui Wang, Bryan O'Gorman, Eleanor G. Rieffel, Davide Venturelli and Rupak Biswas\n
+    From the Quantum Approximate Optimization Algorithm to a Quantum Alternating Operator Ansatz\n
+    Algorithms 12.2 (2019), equations (7) - (10), p. 11
+"""
+struct ParityRingMixerGate <: AbstractGate
+    β::Vector{Float64}
+    d::Vector{Integer} # d (= κ) = number of colors
+
+    function ParityRingMixerGate(β::Real, d::Integer)
+        d > 0 || throw(ArgumentError("Parameter d must be a positive integer!"))
+        new([β], [d])
+    end
+
+end
+
+function Qaintessent.matrix(g::ParityRingMixerGate)
+    X = [0 1; 1 0]
+    Y = [0 -im; im 0]
+
+    # Implements X_a X_{a+1} + Y_a Y_{a+1}, or more generally (⊗_{i ∈ xy_indices} X_i) + (⊗_{i ∈ xy_indices} Y_i)
+    # question: what does the paper mean by X_a for a = d+1? Here, X_{d+1} is just ignored. Also, do they use 1-based indexing or 0-based? (cf. matrix_onehot above)
+    XY_sum = xy_indices -> begin
+        kron((i ∈ xy_indices ? X : I(2) for i ∈ 1:g.d[])...) # passing iterator into kron via varargs syntax
+        + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 1:g.d[])...)
+    end
+
+    # Implements Eq. (8)
+    # question: by a ≠ n, do they actually mean a ≠ d? I assume so.
+    H_odd = sum(XY_sum([a, a+1]) for a ∈ 1:2:(g.d[] - 1))
+    H_even = sum(XY_sum([a, a+1]) for a ∈ 2:2:g.d[])
+    U_odd = exp(-im * g.β[] * H_odd)
+    U_even = exp(-im * g.β[] * H_even)
+
+    # Implements Eq. (9)
+    U_last = isodd(g.d[]) ? exp(-im * g.β[] * XY_sum([g.d[], 1])) : I
+
+    # Implements Eq. (7)
+    U_parity = U_last * U_even * U_odd
+    U_parity
+end
+
+Qaintessent.sparse_matrix(g::ParityRingMixerGate) = sparse(matrix(g))
+
+# wires
+Qaintessent.num_wires(g::ParityRingMixerGate)::Int = g.d[]
