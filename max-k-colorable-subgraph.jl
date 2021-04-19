@@ -4,12 +4,18 @@ using LinearAlgebra
 
 # Simple struct that represents a graph via its edges
 struct Graph
-    n::UInt # number of vertices (indices 1,...,n)
-    edges::Set{Set{UInt}} # edges, represented as sets of vertices
+    n::Integer # number of vertices (indices 1,...,n)
+    edges::Set{Set{Integer}} # edges, represented as sets of vertices
 
-    function Graph(n::UInt, edges::Set{Set{UInt}})
-        all(edge -> edge ⊆ 1:n, edges) || throw(ArgumentError("Some edges have invalid endpoints"))
-        new(n, edges)
+    function Graph(n::Integer, edges::Vector{Tuple{T, T}}) where T <: Integer
+        n >= 1 || throw(DomainError("n must be a positive integer"))
+
+        # Turn into set of sets
+        edge_set = Set(map(Set, edges))
+
+        # Verify that all edges are valid
+        all(edge -> edge ⊆ 1:n, edge_set) || throw(ArgumentError("Some edges have invalid endpoints"))
+        new(n, edge_set)
     end
 end
 
@@ -23,7 +29,7 @@ end
 ``H_{P} = \\sum_{\\{u, v\\} \\in E} \\sum_{a=1}^{\\kappa} Z_{u, a} Z_{v, a}``
 
 Reference:\n
-    Stuart Hadfield, Zhihui Wang, Bryan O'Gorman, Eleanor G. Rieffel,Davide Venturelli and Rupak Biswas\n
+    Stuart Hadfield, Zhihui Wang, Bryan O'Gorman, Eleanor G. Rieffel, Davide Venturelli and Rupak Biswas\n
     From the Quantum Approximate Optimization Algorithm to a Quantum Alternating Operator Ansatz\n
     Algorithms 12.2 (2019), p.34
 """
@@ -31,10 +37,10 @@ struct MaxKColSubgraphPhaseSeparationGate <: AbstractGate
     # TODO possibly rename struct when this is in some module?
     # use a reference type (array with 1 entry) for compatibility with Flux
     γ::Vector{Float64} 
-    κ::Vector{UInt} # the number of possible colors
+    κ::Vector{Integer} # the number of possible colors
     graph::Graph # the underlying graph which should be colored
 
-    function MaxKColSubgraphPhaseSeparationGate(γ::Float64, κ::Int, graph::Graph)
+    function MaxKColSubgraphPhaseSeparationGate(γ::Float64, κ::Integer, graph::Graph)
         κ > 0 || throw(ArgumentError("Parameter κ must be a positive integer!"))
         new([γ], [κ], graph)
     end

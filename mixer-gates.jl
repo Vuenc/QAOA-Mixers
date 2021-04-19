@@ -1,5 +1,6 @@
 include("Qaintessent.jl/src/Qaintessent.jl") # To be replaced by a proper package import at some point
 import .Qaintessent.AbstractGate
+import LinearAlgebra: I
 
 """
     r-nearby values single-qudit mixer gate, which acts on a single qudit
@@ -15,10 +16,10 @@ Reference:\n
 struct RNearbyValuesMixerGate <: AbstractGate
     # use a reference type (array with 1 entry) for compatibility with Flux
     β::Vector{Float64}
-    r::Vector{UInt}
-    d::Vector{UInt}
+    r::Vector{Integer} # this is the r in r-Nearby-values
+    d::Vector{Integer} # d (= κ) = number of colors
 
-    function RNearbyValuesMixerGate(β::Real, r::UInt, d::UInt)
+    function RNearbyValuesMixerGate(β::Real, r::Integer, d::Integer)
         (r > 0 && d > 0) || throw(ArgumentError("Parameters r and d must be positive integers!"))
         new([β], [r], [d])
     end
@@ -31,8 +32,8 @@ function matrix_onehot(g::RNearbyValuesMixerGate)
     X = [0 1; 1 0]
     Y = [0 -im; im 0]
     H_ring_enc = sum( # question: what does the paper mean by X_a for a = 0? Here, X_0 is just ignored
-        kron((i ∈ [a, a+1] ? X : I(2) for i ∈ 1:d)...) # passing iterator into kron via varargs syntax
-        + kron((i ∈ [a, a+1] ? Y : I(2) for i ∈ 1:d)...)
+        kron((i ∈ [a, a+1] ? X : I(2) for i ∈ 1:g.d[])...) # passing iterator into kron via varargs syntax
+        + kron((i ∈ [a, a+1] ? Y : I(2) for i ∈ 1:g.d[])...)
         for a ∈ 0:g.d[]-1
     )
     U_ring_enc = exp(-im * g.β[] * H_ring_enc)
@@ -52,11 +53,11 @@ function matrix_qudit(g::RNearbyValuesMixerGate)
 end
 
 function Qaintessent.matrix(g::RNearbyValuesMixerGate)
-    matrix_qudit(g)
+    matrix_onehot(g)
 end
 
 Qaintessent.sparse_matrix(g::RNearbyValuesMixerGate) = sparse(matrix(g))
 
 # wires
-# TODO: should be d in the one-hot case
-Qaintessent.num_wires(::RNearbyValuesMixerGate)::Int = 1
+# TODO: should be d in the one-hot case, 1 for qudit case
+Qaintessent.num_wires(g::RNearbyValuesMixerGate)::Int = g.d[]
