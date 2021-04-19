@@ -1,5 +1,6 @@
 include("Qaintessent.jl/src/Qaintessent.jl") # To be replaced by a proper package import at some point
-import .Qaintessent: AbstractGate, Circuit, CircuitGate
+include("mixer-gates.jl")
+import .Qaintessent: AbstractGate, Circuit, CircuitGate, MeasurementOperator
 using LinearAlgebra
 
 # Simple struct that represents a graph via its edges
@@ -66,3 +67,25 @@ Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix
 
 # wires
 Qaintessent.num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ[] * g.graph.n
+
+function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Vector{Float64}, 
+        graph::Graph, κ::Integer)
+    length(γs) == length(βs) || throw(ArgumentError("γs and βs must have same length!"))
+    N = graph.n * κ
+
+    # Create the circuit gates (multiple stages of phase separation gate and mixer gates)
+    gates::Vector{CircuitGate} = []
+    for (γ, β) ∈ zip(γs, βs)
+        # Add the phase separation gate
+        push!(gates, CircuitGate(Tuple(1:N), MaxKColSubgraphPhaseSeparationGate(γ, κ, graph)))
+
+        # Add the mixer, consisting of a partial mixer gate for each vertex
+        for vertex in 1:graph.n
+            push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), ParityRingMixerGate(β, κ)))
+        end
+    end
+
+    # One-hot encoding: one qubit for each node/color combination
+    circuit = Circuit{N}(gates) #, [MeasurementOperator(Matrix{Float64}(I, 2^N, 2^N), Tuple(1:N))])
+    circuit
+end
