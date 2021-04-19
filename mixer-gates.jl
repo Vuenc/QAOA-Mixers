@@ -51,12 +51,12 @@ function matrix_qudit(g::RNearbyValuesMixerGate)
     U_rNV
 end
 
-function matrix(g::RNearbyValuesMixerGate)
+function Qaintessent.matrix(g::RNearbyValuesMixerGate)
     matrix_qudit(g)
 end
 
-sparse_matrix(g::RNearbyValuesMixerGate) = sparse(matrix(g))
+Qaintessent.sparse_matrix(g::RNearbyValuesMixerGate) = sparse(matrix(g))
 
 # wires
 # TODO: should be d in the one-hot case
-num_wires(::RNearbyValuesMixerGate)::Int = 1
+Qaintessent.num_wires(::RNearbyValuesMixerGate)::Int = 1

@@ -1,5 +1,5 @@
 include("Qaintessent.jl/src/Qaintessent.jl") # To be replaced by a proper package import at some point
-import .Qaintessent.AbstractGate
+import .Qaintessent: AbstractGate, Circuit, CircuitGate
 using LinearAlgebra
 
 # Simple struct that represents a graph via its edges
@@ -40,7 +40,7 @@ struct MaxKColSubgraphPhaseSeparationGate <: AbstractGate
     end
 end
 
-function matrix(g::MaxKColSubgraphPhaseSeparationGate)
+function Qaintessent.matrix(g::MaxKColSubgraphPhaseSeparationGate)
     Z = [1 0; 0 -1]
 
     # Implementation of Eq. (17)
@@ -56,7 +56,7 @@ function matrix(g::MaxKColSubgraphPhaseSeparationGate)
     U_P
 end
 
-sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix(g))
+Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix(g))
 
 # wires
-num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ[] * g.graph.n
+Qaintessent.num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ[] * g.graph.n
