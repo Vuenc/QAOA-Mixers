@@ -89,3 +89,11 @@ function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Vector{Flo
     circuit = Circuit{N}(gates) #, [MeasurementOperator(Matrix{Float64}(I, 2^N, 2^N), Tuple(1:N))])
     circuit
 end
+
+function ψ_initial(n::Integer, κ::Integer)::Vector{ComplexF64}
+    (n > 0 && κ > 0) || throw(DomainError("Parameters n and κ must be positive integers"))
+
+    # Create the initial state (all vertices are assigned the first color)
+    ψ = kron((color == 1 ? [0.0im, 1] : [1, 0.0im] for vertex ∈ 1:n for color ∈ 1:κ)...)
+    ψ
+end
