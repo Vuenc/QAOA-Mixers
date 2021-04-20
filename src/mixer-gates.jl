@@ -1,5 +1,5 @@
-include("Qaintessent.jl/src/Qaintessent.jl") # To be replaced by a proper package import at some point
-import .Qaintessent.AbstractGate
+using Qaintessent
+import Qaintessent.AbstractGate
 import LinearAlgebra: I
 
 """

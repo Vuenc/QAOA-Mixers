@@ -1,0 +1,8 @@
+name = "QAOAMixers"
+uuid = "c484494e-3455-4bfa-bd7a-0be945f3fb0e"
+authors = ["Vincent Buergin <vincent.buergin@tum.de>"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Qaintessent = "9e6618a4-6605-11ea-2880-e931cf774ea8"

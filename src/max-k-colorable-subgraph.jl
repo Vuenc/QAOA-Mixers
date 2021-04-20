@@ -1,12 +1,11 @@
-include("Qaintessent.jl/src/Qaintessent.jl") # To be replaced by a proper package import at some point
-include("mixer-gates.jl")
-import .Qaintessent: AbstractGate, Circuit, CircuitGate, MeasurementOperator
+using Qaintessent
+import Qaintessent: AbstractGate, Circuit, CircuitGate, MeasurementOperator
 using LinearAlgebra
 
 # Simple struct that represents a graph via its edges
 struct Graph
-    n::Integer # number of vertices (indices 1,...,n)
-    edges::Set{Set{Integer}} # edges, represented as sets of vertices
+    n::Int # number of vertices (indices 1,...,n)
+    edges::Set{Set{Int}} # edges, represented as sets of vertices
 
     function Graph(n::Integer, edges::Vector{Tuple{T, T}}) where T <: Integer
         n >= 1 || throw(DomainError("n must be a positive integer"))
@@ -38,7 +37,7 @@ struct MaxKColSubgraphPhaseSeparationGate <: AbstractGate
     # TODO possibly rename struct when this is in some module?
     # use a reference type (array with 1 entry) for compatibility with Flux
     γ::Vector{Float64} 
-    κ::Vector{Integer} # the number of possible colors
+    κ::Vector{Int} # the number of possible colors
     graph::Graph # the underlying graph which should be colored
 
     function MaxKColSubgraphPhaseSeparationGate(γ::Float64, κ::Integer, graph::Graph)
@@ -86,8 +85,7 @@ function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Vector{Flo
     end
 
     # One-hot encoding: one qubit for each node/color combination
-    circuit = Circuit{N}(gates) #, [MeasurementOperator(Matrix{Float64}(I, 2^N, 2^N), Tuple(1:N))])
-    circuit
+    Circuit{N}(gates) #, [MeasurementOperator(Matrix{Float64}(I, 2^N, 2^N), Tuple(1:N))])
 end
 
 function ψ_initial(n::Integer, κ::Integer)::Vector{ComplexF64}
