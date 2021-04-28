@@ -92,6 +92,30 @@ function ψ_initial(n::Integer, κ::Integer)::Vector{ComplexF64}
     (n > 0 && κ > 0) || throw(DomainError("Parameters n and κ must be positive integers"))
 
     # Create the initial state (all vertices are assigned the first color)
-    ψ = kron((color == 1 ? [0.0im, 1] : [1, 0.0im] for vertex ∈ 1:n for color ∈ 1:κ)...)
+    ψ_from_coloring(n, κ, repeat([1], n))
+end
+
+# Create a state ψ that corresponds to a given coloring
+function ψ_from_coloring(n::Int, κ::Int, colors::Vector{Int})::Vector{ComplexF64}
+    (n > 0 && κ > 0) || throw(DomainError("Parameters n and κ must be positive integers."))
+    colors ⊆ 1:κ || throw(ArgumentError("Parameter `colors` may only contain colors in the range 1:$(κ)."))
+
+    # Create ψ with |1> entries in the indices corresponding to the given colors, |0> elsewhere
+    ψ = kron((color == colors[vertex] ? [0.0im, 1] : [1, 0.0im] for vertex ∈ 1:n for color ∈ 1:κ)...)
     ψ
 end
+
+# Decodes the coloring represented by a single computational basis state, represented as integer
+function decode_basis_state(basis_state::Int, n::Int, κ::Int)::Dict{Int, Vector{Int}}
+    (n > 0 && κ > 0) || throw(DomainError("Parameters n and κ must be positive integers."))
+
+    N = n * κ
+    bits = digits(basis_state, base=2, pad=N) |> reverse
+    vertex_bits = vertex -> bits[((vertex - 1) * κ + 1):(vertex * κ)]
+    colors_by_vertex = Dict([(v, findall(!iszero, vertex_bits(v))) for v ∈ 1:n])
+
+    all(!isnothing, colors_by_vertex) || throw(ArgumentError("The state `basis_state` has at least one vertex without a color."))
+    
+    return colors_by_vertex
+end
+
