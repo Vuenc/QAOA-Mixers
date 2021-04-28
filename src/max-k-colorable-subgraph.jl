@@ -1,6 +1,10 @@
 using Qaintessent
-import Qaintessent: AbstractGate, Circuit, CircuitGate, MeasurementOperator
+# import Qaintessent: AbstractGate, Circuit, CircuitGate, MeasurementOperator
+using Qaintellect
+using Flux
 using LinearAlgebra
+using IterTools: ncycle
+
 
 # Simple struct that represents a graph via its edges
 struct Graph
@@ -74,6 +78,12 @@ function Qaintessent.matrix(g::MaxKColSubgraphPhaseSeparationGate)
     U_P
 end
 
+# TODO make sure this really is the correct adjoint!
+Qaintessent.adjoint(g::MaxKColSubgraphPhaseSeparationGate) = MaxKColSubgraphPhaseSeparationGate(-g.γ[], g.κ, g.graph)
+
+# TODO make sure this is the right way to do it
+Qaintessent.backward(g::MaxKColSubgraphPhaseSeparationGate, ::AbstractMatrix) = g
+
 Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix(g))
 
 # wires
@@ -137,3 +147,6 @@ function decode_basis_state(basis_state::Int, n::Int, κ::Int)::Dict{Int, Vector
     return colors_by_vertex
 end
 
+
+# Make trainable params available to Flux
+Flux.@functor MaxKColSubgraphPhaseSeparationGate

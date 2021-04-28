@@ -1,6 +1,7 @@
 using Qaintessent
 import Qaintessent.AbstractGate
 import LinearAlgebra: I
+using Flux
 
 """
     r-nearby values single-qudit mixer gate, which acts on a single qudit
@@ -55,6 +56,8 @@ end
 function Qaintessent.matrix(g::RNearbyValuesMixerGate)
     matrix_onehot(g)
 end
+
+Qaintessent.adjoint(::RNearbyValuesMixerGate) = throw(ErrorException("Adjoint not implemented for `RNearbyValuesMixerGate`."))
 
 Qaintessent.sparse_matrix(g::RNearbyValuesMixerGate) = sparse(matrix(g))
 
@@ -112,7 +115,16 @@ function Qaintessent.matrix(g::ParityRingMixerGate)
     U_parity
 end
 
+# TODO make sure this really is the correct adjoint!
+Qaintessent.adjoint(g::ParityRingMixerGate) = ParityRingMixerGate(-g.β[], g.d)
+
+# TODO make sure this is the right way to do it
+Qaintessent.backward(g::ParityRingMixerGate, ::AbstractMatrix) = g
+
 Qaintessent.sparse_matrix(g::ParityRingMixerGate) = sparse(matrix(g))
 
 # wires
 Qaintessent.num_wires(g::ParityRingMixerGate)::Int = g.d
+
+# Make trainable params available to Flux
+Flux.@functor ParityRingMixerGate
