@@ -11,10 +11,10 @@ struct Graph
         n >= 1 || throw(DomainError("n must be a positive integer"))
 
         # Turn into set of sets
-        edge_set = Set(map(Set, edges))
+        edge_set = Set(Set.(edges))
 
         # Verify that all edges are valid
-        all(edge -> edge ⊆ 1:n, edge_set) || throw(ArgumentError("Some edges have invalid endpoints"))
+        all(edge -> edge ⊆ 1:n && length(edge) == 2, edge_set) || throw(ArgumentError("Some edges have invalid endpoints"))
         new(n, edge_set)
     end
 end
@@ -37,24 +37,30 @@ struct MaxKColSubgraphPhaseSeparationGate <: AbstractGate
     # TODO possibly rename struct when this is in some module?
     # use a reference type (array with 1 entry) for compatibility with Flux
     γ::Vector{Float64} 
-    κ::Vector{Int} # the number of possible colors
+    κ::Int # the number of possible colors
     graph::Graph # the underlying graph which should be colored
 
     function MaxKColSubgraphPhaseSeparationGate(γ::Float64, κ::Integer, graph::Graph)
         κ > 0 || throw(ArgumentError("Parameter κ must be a positive integer!"))
-        new([γ], [κ], graph)
+        new([γ], κ, graph)
     end
 end
 
-function Qaintessent.matrix(g::MaxKColSubgraphPhaseSeparationGate)
+function phase_separation_hamiltonian(graph::Graph, κ::Int)
     Z = [1 0; 0 -1]
-
+    
     # Implementation of Eq. (17)
     # one-hot encoding: n * κ vector. Index (a-1)*n + (b-1) corresponds to vertex a, color b.
     H_P_enc = sum(
-        kron((color == a && vertex ∈ edge ? Z : I(2) for vertex ∈ 1:g.graph.n for color ∈ 1:g.κ[])...) # Z_{u,a} Z_{v,a}
-        for a ∈ 1:g.κ[] for edge in g.graph.edges # Σ_{(u,v) = edge ∈ E} Σ_{a=1..κ}
+        kron((color == a && vertex ∈ edge ? Z : I(2) for vertex ∈ 1:graph.n for color ∈ 1:κ)...) # Z_{u,a} Z_{v,a}
+        for a ∈ 1:κ for edge ∈ graph.edges # Σ_{(u,v) = edge ∈ E} Σ_{a=1..κ}
     )
+    H_P_enc
+end
+
+function Qaintessent.matrix(g::MaxKColSubgraphPhaseSeparationGate)
+    # Calculate the hamiltonian (Eq. 17)
+    H_P_enc = phase_separation_hamiltonian(g.graph, g.κ)
 
     # Implementation of one-hot phase seperator, A.3.1, p. 34
     U_P = exp(-im * g.γ[] * H_P_enc)
@@ -65,7 +71,7 @@ end
 Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix(g))
 
 # wires
-Qaintessent.num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ[] * g.graph.n
+Qaintessent.num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ * g.graph.n
 
 function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Vector{Float64}, 
         graph::Graph, κ::Integer)
@@ -79,7 +85,7 @@ function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Vector{Flo
         push!(gates, CircuitGate(Tuple(1:N), MaxKColSubgraphPhaseSeparationGate(γ, κ, graph)))
 
         # Add the mixer, consisting of a partial mixer gate for each vertex
-        for vertex in 1:graph.n
+        for vertex ∈ 1:graph.n
             push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), ParityRingMixerGate(β, κ)))
         end
     end
