@@ -77,11 +77,11 @@ Reference:\n
 """
 struct ParityRingMixerGate <: AbstractGate
     β::Vector{Float64}
-    d::Vector{Integer} # d (= κ) = number of colors
+    d::Integer # d (= κ) = number of colors
 
     function ParityRingMixerGate(β::Real, d::Integer)
         d > 0 || throw(ArgumentError("Parameter d must be a positive integer!"))
-        new([β], [d])
+        new([β], d)
     end
 
 end

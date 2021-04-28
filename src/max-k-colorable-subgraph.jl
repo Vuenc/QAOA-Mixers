@@ -19,6 +19,12 @@ struct Graph
     end
 end
 
+# Utility function to count the properly colored edges in a graph coloring (i.e. endpoints have different colors)
+function properly_colored_edges(graph::Graph, coloring::Vector{Int})
+    length(coloring) == graph.n || throw(ArgumentError("Length of coloring must equal the number of vertices."))
+    count(coloring[a] != coloring[b] for (a, b) in graph.edges)
+end 
+
 """
     Phase separation gate for Max-κ-colorable subgraph QAOA mapping.
     Represents the objective function which counts the number of invalid
@@ -109,6 +115,12 @@ function ψ_from_coloring(n::Int, κ::Int, colors::Vector{Int})::Vector{ComplexF
     # Create ψ with |1> entries in the indices corresponding to the given colors, |0> elsewhere
     ψ = kron((color == colors[vertex] ? [0.0im, 1] : [1, 0.0im] for vertex ∈ 1:n for color ∈ 1:κ)...)
     ψ
+end
+
+# Utility function to compute the probabilities of the outcomes represented by a wavefunction ψ, sorted by descending probability
+function output_distribution(ψ_out::Vector{ComplexF64})::Vector{Tuple{Int, Real}}
+    distribution = [(i-1, abs(amplitude)^2) for (i, amplitude) ∈ enumerate(ψ_out)]
+    return sort(distribution, by=(t -> -t[2]))
 end
 
 # Decodes the coloring represented by a single computational basis state, represented as integer
