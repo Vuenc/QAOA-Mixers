@@ -82,7 +82,13 @@ end
 Qaintessent.adjoint(g::MaxKColSubgraphPhaseSeparationGate) = MaxKColSubgraphPhaseSeparationGate(-g.γ[], g.κ, g.graph)
 
 # TODO make sure this is the right way to do it
-Qaintessent.backward(g::MaxKColSubgraphPhaseSeparationGate, ::AbstractMatrix) = g
+function Qaintessent.backward(g::MaxKColSubgraphPhaseSeparationGate, Δ::AbstractMatrix)
+    H_P_enc = phase_separation_hamiltonian(g.graph, g.κ)
+
+    # we can exploit that H_P_enc is diagonal
+    # TODO make sure to handle Δ correctly
+    return MatrixGate(-im * H_P_enc * exp(-im * g.γ[] * H_P_enc) * Δ)
+end
 
 Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix(g))
 
