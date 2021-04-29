@@ -153,6 +153,37 @@ function decode_basis_state(basis_state::Int, n::Int, κ::Int)::Dict{Int, Vector
     return colors_by_vertex
 end
 
+function optimize_qaoa(graph::Graph, κ::Int, p::Int, training_rounds::Int=10, learning_rate::Real=0.1)
+    (κ > 0 && p > 0 && training_rounds > 0) || 
+        throw(DomainError("Parameters `κ`, `p` and `training_rounds` must be positive integers."))
+
+    # Initialize circuit and wavefunction
+    (initial_γs, initial_βs) = (randn(p), randn(p))
+    println("Initial γs: $(initial_γs)")
+    println("Initial βs: $(initial_βs)")
+    circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ)
+    ψ = ψ_initial(graph.n, κ)
+    H_P = phase_separation_hamiltonian(graph, κ)
+    # TODO convert H_P output to number of edges via inverse of f(x) |-> κm - 4 f(x)
+
+    # Set up optimization with Flux
+    params = Flux.params(circ)
+    # data = repeat([()], training_rounds) # empty input data for `training_rounds` rounds of training
+    data = ncycle([()], training_rounds)
+    optimizer = Descent(learning_rate)
+    expectation() = begin # evaluate expectation <f> to be minimized
+        ψ_out = apply(ψ, circ.moments)
+        real(ψ_out' * H_P * ψ_out)
+    end
+    print_expectation() = println("Training: <f> = $(expectation())")
+
+    println("Before training: <f> = $(expectation())")
+
+    # Perform training
+    Flux.train!(expectation, params, data, optimizer, cb=Flux.throttle(print_expectation, 1))
+
+    circ
+end
 
 # Make trainable params available to Flux
 Flux.@functor MaxKColSubgraphPhaseSeparationGate
