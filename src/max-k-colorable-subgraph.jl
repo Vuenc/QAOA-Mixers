@@ -117,8 +117,6 @@ function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Vector{Flo
 end
 
 function ψ_initial(n::Integer, κ::Integer)::Vector{ComplexF64}
-    (n > 0 && κ > 0) || throw(DomainError("Parameters n and κ must be positive integers"))
-
     # Create the initial state (all vertices are assigned the first color)
     ψ_from_coloring(n, κ, repeat([1], n))
 end
