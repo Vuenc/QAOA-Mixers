@@ -133,9 +133,43 @@ function ψ_from_coloring(n::Int, κ::Int, colors::Vector{Int})::Vector{ComplexF
 end
 
 # Utility function to compute the probabilities of the outcomes represented by a wavefunction ψ, sorted by descending probability
-function output_distribution(ψ_out::Vector{ComplexF64})::Vector{Tuple{Int, Real}}
-    distribution = [(i-1, abs(amplitude)^2) for (i, amplitude) ∈ enumerate(ψ_out)]
+function wavefunction_distribution(ψ::Vector{ComplexF64}; as_bitstrings::Bool = true,
+        include_zero = false)::Union{Vector{Tuple{Int, Float64}}, Vector{Tuple{Vector{Int}, Float64}}}
+    distribution = [(i-1, abs(amplitude)^2) for (i, amplitude) ∈ enumerate(ψ) if abs(amplitude) > 0 || include_zero]
+    if as_bitstrings
+        N = Int(log2(length(ψ_out)))
+        distribution = [(digits(i, base=2, pad=N) |> reverse, p) for (i, p) ∈ distribution]
+    end
+    
     return sort(distribution, by=(t -> -t[2]))
+end
+
+# Utility function to compute the probabilities of the outcome wavefunction of a circuit applied to ψ, sorted by descending probability
+function output_distribution(circ::Circuit, ψ::Vector{ComplexF64}; as_bitstrings::Bool = true,
+        include_zero = false)::Union{Vector{Tuple{Int, Float64}}, Vector{Tuple{Vector{Int}, Float64}}}
+    ψ_out = apply(ψ, circ.moments)
+    return wavefunction_distribution(ψ_out, as_bitstrings=as_bitstrings, include_zero=include_zero)
+end
+
+# Utility function to compute the probabilities of the output colorings of a circuit applied to ψ, sorted by descending probability
+function output_colorings_distribution(circ::Circuit{N}, n::Int;
+        include_zero = false)::Vector{Tuple{Dict{Int, Vector{Int}}, Float64}} where {N}
+    κ = Int(N / n)
+    ψ = ψ_initial(n, κ)
+    ψ_out = apply(ψ, circ.moments)
+    distribution = wavefunction_distribution(ψ_out, as_bitstrings=false, include_zero=include_zero)
+
+    return [(decode_basis_state(state, n, κ), p) for (state, p) ∈ distribution]
+end
+
+# Utility function to compute the probabilities of the output colorings of a circuit applied to ψ, sorted by descending probability
+function output_colorings_distribution_scored(circ::Circuit{N}, graph::Graph;
+        include_zero = false)::Vector{Tuple{Vector{Int}, Int, Float64}} where {N}
+    dist = output_colorings_distribution(circ, graph.n, include_zero = include_zero)
+    
+    coloring_dict_to_list(dict) = [dict[i][1] for i ∈ 1:graph.n]
+
+    return [(coloring_dict_to_list(coloring), properly_colored_edges(graph, coloring_dict_to_list(coloring)), p) for (coloring, p) ∈ dist]
 end
 
 # Decodes the coloring represented by a single computational basis state, represented as integer
