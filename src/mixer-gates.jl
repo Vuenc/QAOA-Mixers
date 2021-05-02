@@ -32,9 +32,10 @@ function matrix_onehot(g::RNearbyValuesMixerGate)
     
     X = [0 1; 1 0]
     Y = [0 -im; im 0]
-    H_ring_enc = sum( # question: what does the paper mean by X_a for a = 0? Here, X_0 is just ignored
-        kron((i ∈ [a, a+1] ? X : I(2) for i ∈ 1:g.d)...) # passing iterator into kron via varargs syntax
-        + kron((i ∈ [a, a+1] ? Y : I(2) for i ∈ 1:g.d)...)
+
+    H_ring_enc = sum(
+        kron((i ∈ [a, (a+1) % g.d] ? X : I(2) for i ∈ 0:g.d-1)...) # passing iterator into kron via varargs syntax
+        + kron((i ∈ [a, (a+1) % g.d] ? Y : I(2) for i ∈ 0:g.d-1)...)
         for a ∈ 0:g.d-1
     )
     U_ring_enc = exp(-im * g.β[] * H_ring_enc)
@@ -53,11 +54,23 @@ function matrix_qudit(g::RNearbyValuesMixerGate)
     U_rNV
 end
 
+# TODO make sure this is the right way to do it
+function Qaintessent.backward(g::RNearbyValuesMixerGate, Δ::AbstractMatrix)
+    delta = 1e-8
+
+    U_rnv1 = Qaintessent.matrix(RNearbyValuesMixerGate(g.β[] - delta/2, g.r, g.d))
+    U_rnv2 = Qaintessent.matrix(RNearbyValuesMixerGate(g.β[] + delta/2, g.r, g.d))
+
+    U_deriv = (U_rnv2 - U_rnv1) / delta
+
+    return RNearbyValuesMixerGate(sum(real(U_deriv .* Δ)), g.r, g.d)
+end
+
 function Qaintessent.matrix(g::RNearbyValuesMixerGate)
     matrix_onehot(g)
 end
 
-Qaintessent.adjoint(::RNearbyValuesMixerGate) = throw(ErrorException("Adjoint not implemented for `RNearbyValuesMixerGate`."))
+Qaintessent.adjoint(g::RNearbyValuesMixerGate) = RNearbyValuesMixerGate(-g.β[], g.r, g.d)
 
 Qaintessent.sparse_matrix(g::RNearbyValuesMixerGate) = sparse(matrix(g))
 
@@ -94,21 +107,19 @@ function Qaintessent.matrix(g::ParityRingMixerGate)
     Y = [0 -im; im 0]
 
     # Implements X_a X_{a+1} + Y_a Y_{a+1}, or more generally (⊗_{i ∈ xy_indices} X_i) + (⊗_{i ∈ xy_indices} Y_i)
-    # question: what does the paper mean by X_a for a = d+1? Here, X_{d+1} is just ignored. Also, do they use 1-based indexing or 0-based? (cf. matrix_onehot above)
-    XY_sum = xy_indices -> begin
-        kron((i ∈ xy_indices ? X : I(2) for i ∈ 1:g.d)...) # passing iterator into kron via varargs syntax
-        + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 1:g.d)...)
+    # question: what does the paper mean by X_a for a = d+1?
+    XY_sum(xy_indices) = begin
+        return kron((i ∈ xy_indices ? X : I(2) for i ∈ 0:(g.d - 1))...) # passing iterator into kron via varargs syntax
+                + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 0:(g.d - 1))...)
     end
 
     # Implements Eq. (8)
-    # question: by a ≠ n, do they actually mean a ≠ d? I assume so.
-    H_odd = sum(XY_sum([a, a+1]) for a ∈ 1:2:(g.d - 1))
-    H_even = sum(XY_sum([a, a+1]) for a ∈ 2:2:g.d)
-    U_odd = exp(-im * g.β[] * H_odd)
-    U_even = exp(-im * g.β[] * H_even)
+    # # question: by a ≠ n, do they actually mean a ≠ d? I assume so.
+    U_odd = prod([exp(-im * g.β[] * XY_sum([a, a+1])) for a ∈ 1:2:(g.d - 2)], init=I)
+    U_even = prod([exp(-im * g.β[] * XY_sum([a, (a+1) % g.d])) for a ∈ 0:2:(g.d - 1)], init=I)
 
     # Implements Eq. (9)
-    U_last = isodd(g.d) ? exp(-im * g.β[] * XY_sum([g.d, 1])) : I
+    U_last =  isodd(g.d) ? exp(-im * g.β[] * XY_sum([g.d - 1, 0])) : I
 
     # Implements Eq. (7)
     U_parity = U_last * U_even * U_odd
@@ -119,7 +130,16 @@ end
 Qaintessent.adjoint(g::ParityRingMixerGate) = ParityRingMixerGate(-g.β[], g.d)
 
 # TODO make sure this is the right way to do it
-Qaintessent.backward(g::ParityRingMixerGate, ::AbstractMatrix) = g
+function Qaintessent.backward(g::ParityRingMixerGate, Δ::AbstractMatrix)
+    delta = 1e-8
+
+    U_parity1 = Qaintessent.matrix(ParityRingMixerGate(g.β[] - delta/2, g.d))
+    U_parity2 = Qaintessent.matrix(ParityRingMixerGate(g.β[] + delta/2, g.d))
+
+    U_deriv = (U_parity2 - U_parity1) / delta
+
+    return ParityRingMixerGate(sum(real(U_deriv .* Δ)), g.d)
+end
 
 Qaintessent.sparse_matrix(g::ParityRingMixerGate) = sparse(matrix(g))
 
