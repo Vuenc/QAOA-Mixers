@@ -187,7 +187,7 @@ function decode_basis_state(basis_state::Int, n::Int, κ::Int)::Dict{Int, Vector
     return colors_by_vertex
 end
 
-function optimize_qaoa(graph::Graph, κ::Int, p::Int, training_rounds::Int=10, learning_rate::Real=0.1)
+function optimize_qaoa(graph::Graph, κ::Int, p::Int; training_rounds::Int=10, learning_rate::Real=0.1)
     (κ > 0 && p > 0 && training_rounds > 0) || 
         throw(DomainError("Parameters `κ`, `p` and `training_rounds` must be positive integers."))
 
@@ -198,23 +198,29 @@ function optimize_qaoa(graph::Graph, κ::Int, p::Int, training_rounds::Int=10, l
     circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ)
     ψ = ψ_initial(graph.n, κ)
     H_P = phase_separation_hamiltonian(graph, κ)
-    # TODO convert H_P output to number of edges via inverse of f(x) |-> κm - 4 f(x)
+    
+    # Undo the transform of HP to the objective function: f(x) |-> κm - 4 f(x). See text after Eq. (17).
+    objective_transform(x) = (κ*length(graph.edges) - x)/4
 
     # Set up optimization with Flux
     params = Flux.params(circ)
     # data = repeat([()], training_rounds) # empty input data for `training_rounds` rounds of training
     data = ncycle([()], training_rounds)
-    optimizer = Descent(learning_rate)
-    expectation() = begin # evaluate expectation <f> to be minimized
+    # optimizer = Descent(learning_rate)
+    optimizer = ADAM(learning_rate)
+    round = 0
+    expectation() = begin # evaluate expectation <f> to be minimized and print it
         ψ_out = apply(ψ, circ.moments)
-        real(ψ_out' * H_P * ψ_out)
+        objective = objective_transform(real(ψ_out' * H_P * ψ_out))
+        println("Training, round $(round): average objective = $(objective)")
+        round += 1
+        return objective
     end
-    print_expectation() = println("Training: <f> = $(expectation())")
-
-    println("Before training: <f> = $(expectation())")
 
     # Perform training
-    Flux.train!(expectation, params, data, optimizer, cb=Flux.throttle(print_expectation, 1))
+    Flux.train!(expectation, params, data, optimizer) #, cb=Flux.throttle(print_expectation, 1))
+
+    println("After training: <f> = $(expectation())")
 
     circ
 end
