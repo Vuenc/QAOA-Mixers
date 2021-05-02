@@ -109,7 +109,8 @@ function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Vector{Flo
 
         # Add the mixer, consisting of a partial mixer gate for each vertex
         for vertex ∈ 1:graph.n
-            push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), ParityRingMixerGate(β, κ)))
+            # push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), ParityRingMixerGate(β, κ)))
+            push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), RNearbyValuesMixerGate(β, 1, κ)))
         end
     end
 
