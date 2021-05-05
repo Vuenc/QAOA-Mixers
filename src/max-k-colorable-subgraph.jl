@@ -88,7 +88,7 @@ function Qaintessent.backward(g::MaxKColSubgraphPhaseSeparationGate, Δ::Abstrac
     # we can exploit that H_P_enc is diagonal
     U_deriv = -im * H_P_enc * exp(-im * g.γ[] * H_P_enc)
 
-    return MaxKColSubgraphPhaseSeparationGate(sum(real(2 * H_P_deriv .* Δ)), g.κ[], g.graph)
+    return MaxKColSubgraphPhaseSeparationGate(sum(real(2 * U_deriv .* Δ)), g.κ[], g.graph)
 end
 
 Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix(g))
@@ -192,7 +192,8 @@ function optimize_qaoa(graph::Graph, κ::Int, p::Int; training_rounds::Int=10, l
         throw(DomainError("Parameters `κ`, `p` and `training_rounds` must be positive integers."))
 
     # Initialize circuit and wavefunction
-    (initial_γs, initial_βs) = (randn(p), randn(p))
+    (initial_γs, initial_βs) = (randn(p) / 10, randn(p) / 10)
+    # (initial_γs, initial_βs) = ([-1.4394720003096078, 1.2587508176870617], [-1.4318010870388687, 1.4083783153507872])
     println("Initial γs: $(initial_γs)")
     println("Initial βs: $(initial_βs)")
     circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ)
