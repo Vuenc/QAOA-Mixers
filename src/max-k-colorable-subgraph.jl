@@ -4,6 +4,7 @@ using Qaintellect
 using Flux
 using LinearAlgebra
 using IterTools: ncycle
+using SparseArrays
 
 
 # Simple struct that represents a graph via its edges
@@ -86,7 +87,8 @@ function Qaintessent.backward(g::MaxKColSubgraphPhaseSeparationGate, Δ::Abstrac
     H_P_enc = phase_separation_hamiltonian(g.graph, g.κ)
 
     # we can exploit that H_P_enc is diagonal
-    U_deriv = -im * H_P_enc * exp(-im * g.γ[] * H_P_enc)
+    # uses conjugated gradient matrix
+    U_deriv = im * H_P_enc * exp(im * g.γ[] * H_P_enc)
 
     return MaxKColSubgraphPhaseSeparationGate(sum(real(2 * U_deriv .* Δ)), g.κ[], g.graph)
 end

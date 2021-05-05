@@ -57,13 +57,13 @@ end
 # TODO make sure this is the right way to do it
 function Qaintessent.backward(g::RNearbyValuesMixerGate, Δ::AbstractMatrix)
     delta = 1e-8
-
-    U_rnv1 = Qaintessent.matrix(RNearbyValuesMixerGate(g.β[] - delta/2, g.r, g.d))
-    U_rnv2 = Qaintessent.matrix(RNearbyValuesMixerGate(g.β[] + delta/2, g.r, g.d))
+    # uses conjugated gradient matrix
+    U_rnv1 = Qaintessent.matrix(RNearbyValuesMixerGate(-g.β[] + delta/2, g.r, g.d))
+    U_rnv2 = Qaintessent.matrix(RNearbyValuesMixerGate(-g.β[] - delta/2, g.r, g.d))
 
     U_deriv = (U_rnv2 - U_rnv1) / delta
 
-    return RNearbyValuesMixerGate(sum(real(U_deriv .* Δ)), g.r, g.d)
+    return RNearbyValuesMixerGate(sum(real(2 * U_deriv .* Δ)), g.r, g.d)
 end
 
 function Qaintessent.matrix(g::RNearbyValuesMixerGate)
@@ -132,7 +132,7 @@ Qaintessent.adjoint(g::ParityRingMixerGate) = ParityRingMixerGate(-g.β[], g.d)
 # TODO make sure this is the right way to do it
 function Qaintessent.backward(g::ParityRingMixerGate, Δ::AbstractMatrix)
     delta = 1e-8
-
+    
     U_parity1 = Qaintessent.matrix(ParityRingMixerGate(g.β[] - delta/2, g.d))
     U_parity2 = Qaintessent.matrix(ParityRingMixerGate(g.β[] + delta/2, g.d))
 
