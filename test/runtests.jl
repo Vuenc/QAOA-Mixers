@@ -3,6 +3,6 @@ using TestSetExtensions
 
 
 @testset "All the tests" begin
-    @includetests ARGS
-    # @includetests ["test_register"]
+    # @includetests ARGS
+    @includetests ["test_hamiltonians"]
 end
