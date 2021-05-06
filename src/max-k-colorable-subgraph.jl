@@ -26,7 +26,7 @@ end
 # Utility function to count the properly colored edges in a graph coloring (i.e. endpoints have different colors)
 function properly_colored_edges(graph::Graph, coloring::Vector{Int})
     length(coloring) == graph.n || throw(ArgumentError("Length of coloring must equal the number of vertices."))
-    count(coloring[a] != coloring[b] for (a, b) in graph.edges)
+    return count(coloring[a] != coloring[b] for (a, b) ∈ graph.edges)
 end 
 
 """
@@ -51,7 +51,8 @@ struct MaxKColSubgraphPhaseSeparationGate <: AbstractGate
     graph::Graph # the underlying graph which should be colored
 
     function MaxKColSubgraphPhaseSeparationGate(γ::Float64, κ::Integer, graph::Graph)
-        κ > 0 || throw(ArgumentError("Parameter κ must be a positive integer!"))
+        κ > 0 || throw(ArgumentError("Parameter `κ` must be a positive integer."))
+        length(graph.edges) > 0 || throw(ArgumentError("Graph `graph` must have at least one edge."))
         new([γ], κ, graph)
     end
 end
@@ -138,7 +139,7 @@ function wavefunction_distribution(ψ::Vector{ComplexF64}; as_bitstrings::Bool =
         include_zero = false)::Union{Vector{Tuple{Int, Float64}}, Vector{Tuple{Vector{Int}, Float64}}}
     distribution = [(i-1, abs(amplitude)^2) for (i, amplitude) ∈ enumerate(ψ) if abs(amplitude) > 0 || include_zero]
     if as_bitstrings
-        N = Int(log2(length(ψ_out)))
+        N = Int(log2(length(ψ)))
         distribution = [(digits(i, base=2, pad=N) |> reverse, p) for (i, p) ∈ distribution]
     end
     
