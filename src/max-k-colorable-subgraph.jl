@@ -86,7 +86,8 @@ function Qaintessent.backward(g::MaxKColSubgraphPhaseSeparationGate, Δ::Abstrac
     H_P_enc = phase_separation_hamiltonian(g.graph, g.κ)
 
     # we can exploit that H_P_enc is diagonal
-    U_deriv = conj(-im * H_P_enc * exp(-im * g.γ[] * H_P_enc))
+    # uses conjugated gradient matrix
+    U_deriv = im * H_P_enc * exp(im * g.γ[] * H_P_enc)
     
     return MaxKColSubgraphPhaseSeparationGate(2 * sum(real(U_deriv .* Δ)), g.κ[], g.graph)
 end
