@@ -1,7 +1,7 @@
 using Qaintessent
-import Qaintessent.AbstractGate
-import LinearAlgebra: I
+using LinearAlgebra: I
 using Flux
+using SparseArrays: sparse
 
 """
     r-nearby values single-qudit mixer gate, which acts on a single qudit

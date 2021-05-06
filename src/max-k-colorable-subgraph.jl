@@ -1,9 +1,8 @@
 using Qaintessent
-# import Qaintessent: AbstractGate, Circuit, CircuitGate, MeasurementOperator
 using Qaintellect
 using Flux
 using LinearAlgebra
-using IterTools: ncycle
+using SparseArrays: sparse
 
 
 # Simple struct that represents a graph via its edges
