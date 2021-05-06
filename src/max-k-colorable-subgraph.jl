@@ -1,10 +1,8 @@
 using Qaintessent
-# import Qaintessent: AbstractGate, Circuit, CircuitGate, MeasurementOperator
 using Qaintellect
 using Flux
 using LinearAlgebra
-using IterTools: ncycle
-using SparseArrays
+using SparseArrays: sparse
 
 
 # Simple struct that represents a graph via its edges
@@ -27,7 +25,7 @@ end
 # Utility function to count the properly colored edges in a graph coloring (i.e. endpoints have different colors)
 function properly_colored_edges(graph::Graph, coloring::Vector{Int})
     length(coloring) == graph.n || throw(ArgumentError("Length of coloring must equal the number of vertices."))
-    count(coloring[a] != coloring[b] for (a, b) in graph.edges)
+    return count(coloring[a] != coloring[b] for (a, b) ∈ graph.edges)
 end 
 
 """
@@ -52,7 +50,8 @@ struct MaxKColSubgraphPhaseSeparationGate <: AbstractGate
     graph::Graph # the underlying graph which should be colored
 
     function MaxKColSubgraphPhaseSeparationGate(γ::Float64, κ::Integer, graph::Graph)
-        κ > 0 || throw(ArgumentError("Parameter κ must be a positive integer!"))
+        κ > 0 || throw(ArgumentError("Parameter `κ` must be a positive integer."))
+        length(graph.edges) > 0 || throw(ArgumentError("Graph `graph` must have at least one edge."))
         new([γ], κ, graph)
     end
 end
@@ -89,8 +88,8 @@ function Qaintessent.backward(g::MaxKColSubgraphPhaseSeparationGate, Δ::Abstrac
     # we can exploit that H_P_enc is diagonal
     # uses conjugated gradient matrix
     U_deriv = im * H_P_enc * exp(im * g.γ[] * H_P_enc)
-
-    return MaxKColSubgraphPhaseSeparationGate(sum(real(2 * U_deriv .* Δ)), g.κ[], g.graph)
+    
+    return MaxKColSubgraphPhaseSeparationGate(2 * sum(real(U_deriv .* Δ)), g.κ[], g.graph)
 end
 
 Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix(g))
@@ -98,19 +97,19 @@ Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix
 # wires
 Qaintessent.num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ * g.graph.n
 
-function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Vector{Float64}, 
+function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Matrix{Float64},
         graph::Graph, κ::Integer)
-    length(γs) == length(βs) || throw(ArgumentError("γs and βs must have same length!"))
+    size(βs) == (graph.n, length(γs)) || throw(ArgumentError("γs, βs have incorrect dimensions."))
     N = graph.n * κ
 
     # Create the circuit gates (multiple stages of phase separation gate and mixer gates)
     gates::Vector{CircuitGate} = []
-    for (γ, β) ∈ zip(γs, βs)
+    for (γ, βs_column) ∈ zip(γs, eachcol(βs))
         # Add the phase separation gate
         push!(gates, CircuitGate(Tuple(1:N), MaxKColSubgraphPhaseSeparationGate(γ, κ, graph)))
 
         # Add the mixer, consisting of a partial mixer gate for each vertex
-        for vertex ∈ 1:graph.n
+        for (vertex, β) ∈ zip(1:graph.n, βs_column)
             # push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), ParityRingMixerGate(β, κ)))
             push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), RNearbyValuesMixerGate(β, 1, κ)))
         end
@@ -140,7 +139,7 @@ function wavefunction_distribution(ψ::Vector{ComplexF64}; as_bitstrings::Bool =
         include_zero = false)::Union{Vector{Tuple{Int, Float64}}, Vector{Tuple{Vector{Int}, Float64}}}
     distribution = [(i-1, abs(amplitude)^2) for (i, amplitude) ∈ enumerate(ψ) if abs(amplitude) > 0 || include_zero]
     if as_bitstrings
-        N = Int(log2(length(ψ_out)))
+        N = Int(log2(length(ψ)))
         distribution = [(digits(i, base=2, pad=N) |> reverse, p) for (i, p) ∈ distribution]
     end
     
@@ -189,16 +188,26 @@ function decode_basis_state(basis_state::Int, n::Int, κ::Int)::Dict{Int, Vector
     return colors_by_vertex
 end
 
-function optimize_qaoa(graph::Graph, κ::Int, p::Int; training_rounds::Int=10, learning_rate::Real=0.1)
-    (κ > 0 && p > 0 && training_rounds > 0) || 
+function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, training_rounds::Int=10,
+        learning_rate::Real=0.005, circ_in::Union{Circuit{N}, Nothing}=nothing, init_stddev=0.1) where {N}
+
+    (isnothing(circ_in) ⊻ isnothing(p)) ||
+        throw(ArgumentError("Must specify exactly one of the parameters `circ_in` and `p`."))
+
+    (κ > 0 && (isnothing(p) || p > 0) && training_rounds > 0) ||
         throw(DomainError("Parameters `κ`, `p` and `training_rounds` must be positive integers."))
 
-    # Initialize circuit and wavefunction
-    (initial_γs, initial_βs) = (randn(p) / 10, randn(p) / 10)
-    # (initial_γs, initial_βs) = ([-1.4394720003096078, 1.2587508176870617], [-1.4318010870388687, 1.4083783153507872])
-    println("Initial γs: $(initial_γs)")
-    println("Initial βs: $(initial_βs)")
-    circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ)
+    if isnothing(circ_in)
+        # Initialize circuit and wavefunction
+        (initial_γs, initial_βs) = (randn(p) * init_stddev, randn((graph.n, p)) * init_stddev)
+        
+        println("Initial γs: $(initial_γs)")
+        println("Initial βs: $(initial_βs)")
+        circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ)
+    else
+        N == κ * graph.n || throw(ArgumentError("Circuit `circ_in` has wrong dimensions."))
+        circ = circ_in
+    end
     ψ = ψ_initial(graph.n, κ)
     H_P = phase_separation_hamiltonian(graph, κ)
     
@@ -207,25 +216,20 @@ function optimize_qaoa(graph::Graph, κ::Int, p::Int; training_rounds::Int=10, l
 
     # Set up optimization with Flux
     params = Flux.params(circ)
-    # data = repeat([()], training_rounds) # empty input data for `training_rounds` rounds of training
-    data = ncycle([()], training_rounds)
-    # optimizer = Descent(learning_rate)
+    data = repeat([()], training_rounds) # empty input data for `training_rounds` rounds of training
     optimizer = ADAM(learning_rate)
-    round = 0
+    round = 1
     expectation() = begin # evaluate expectation <f> to be minimized and print it
         ψ_out = apply(ψ, circ.moments)
         objective = objective_transform(real(ψ_out' * H_P * ψ_out))
         println("Training, round $(round): average objective = $(objective)")
         round += 1
-        return objective
+        return -objective
     end
 
     # Perform training
     Flux.train!(expectation, params, data, optimizer) #, cb=Flux.throttle(print_expectation, 1))
-
-    println("After training: <f> = $(expectation())")
-
-    circ
+    return circ
 end
 
 # Make trainable params available to Flux
