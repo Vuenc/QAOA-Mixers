@@ -96,19 +96,19 @@ Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix
 # wires
 Qaintessent.num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ * g.graph.n
 
-function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Vector{Float64}, 
+function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Matrix{Float64},
         graph::Graph, κ::Integer)
-    length(γs) == length(βs) || throw(ArgumentError("γs and βs must have same length!"))
+    size(βs) == (graph.n, length(γs)) || throw(ArgumentError("γs, βs have incorrect dimensions."))
     N = graph.n * κ
 
     # Create the circuit gates (multiple stages of phase separation gate and mixer gates)
     gates::Vector{CircuitGate} = []
-    for (γ, β) ∈ zip(γs, βs)
+    for (γ, βs_column) ∈ zip(γs, eachcol(βs))
         # Add the phase separation gate
         push!(gates, CircuitGate(Tuple(1:N), MaxKColSubgraphPhaseSeparationGate(γ, κ, graph)))
 
         # Add the mixer, consisting of a partial mixer gate for each vertex
-        for vertex ∈ 1:graph.n
+        for (vertex, β) ∈ zip(1:graph.n, βs_column)
             # push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), ParityRingMixerGate(β, κ)))
             push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), RNearbyValuesMixerGate(β, 1, κ)))
         end
@@ -187,16 +187,22 @@ function decode_basis_state(basis_state::Int, n::Int, κ::Int)::Dict{Int, Vector
     return colors_by_vertex
 end
 
-function optimize_qaoa(graph::Graph, κ::Int, p::Int; training_rounds::Int=10, learning_rate::Real=0.1)
+function optimize_qaoa(graph::Graph, κ::Int, p::Int; training_rounds::Int=10,
+        learning_rate::Real=0.005, circ_in::Union{Circuit, Nothing}=nothing, init_stddev=0.1)
+
     (κ > 0 && p > 0 && training_rounds > 0) || 
         throw(DomainError("Parameters `κ`, `p` and `training_rounds` must be positive integers."))
 
-    # Initialize circuit and wavefunction
-    (initial_γs, initial_βs) = (randn(p) / 10, randn(p) / 10)
-    # (initial_γs, initial_βs) = ([-1.4394720003096078, 1.2587508176870617], [-1.4318010870388687, 1.4083783153507872])
-    println("Initial γs: $(initial_γs)")
-    println("Initial βs: $(initial_βs)")
-    circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ)
+    if circ_in isa Nothing
+        # Initialize circuit and wavefunction
+        (initial_γs, initial_βs) = (randn(p) * init_stddev, randn((graph.n, p)) * init_stddev)
+        
+        println("Initial γs: $(initial_γs)")
+        println("Initial βs: $(initial_βs)")
+        circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ)
+    else
+        circ = circ_in
+    end
     ψ = ψ_initial(graph.n, κ)
     H_P = phase_separation_hamiltonian(graph, κ)
     

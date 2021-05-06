@@ -148,3 +148,4 @@ Qaintessent.num_wires(g::ParityRingMixerGate)::Int = g.d
 
 # Make trainable params available to Flux
 Flux.@functor ParityRingMixerGate
+Flux.@functor RNearbyValuesMixerGate
