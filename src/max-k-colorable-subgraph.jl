@@ -188,13 +188,16 @@ function decode_basis_state(basis_state::Int, n::Int, κ::Int)::Dict{Int, Vector
     return colors_by_vertex
 end
 
-function optimize_qaoa(graph::Graph, κ::Int, p::Int; training_rounds::Int=10,
-        learning_rate::Real=0.005, circ_in::Union{Circuit, Nothing}=nothing, init_stddev=0.1)
+function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, training_rounds::Int=10,
+        learning_rate::Real=0.005, circ_in::Union{Circuit{N}, Nothing}=nothing, init_stddev=0.1) where {N}
 
-    (κ > 0 && p > 0 && training_rounds > 0) || 
+    (isnothing(circ_in) ⊻ isnothing(p)) ||
+        throw(ArgumentError("Must specify exactly one of the parameters `circ_in` and `p`."))
+
+    (κ > 0 && (isnothing(p) || p > 0) && training_rounds > 0) ||
         throw(DomainError("Parameters `κ`, `p` and `training_rounds` must be positive integers."))
 
-    if circ_in isa Nothing
+    if isnothing(circ_in)
         # Initialize circuit and wavefunction
         (initial_γs, initial_βs) = (randn(p) * init_stddev, randn((graph.n, p)) * init_stddev)
         
@@ -202,6 +205,7 @@ function optimize_qaoa(graph::Graph, κ::Int, p::Int; training_rounds::Int=10,
         println("Initial βs: $(initial_βs)")
         circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ)
     else
+        N == κ * graph.n || throw(ArgumentError("Circuit `circ_in` has wrong dimensions."))
         circ = circ_in
     end
     ψ = ψ_initial(graph.n, κ)
@@ -212,25 +216,20 @@ function optimize_qaoa(graph::Graph, κ::Int, p::Int; training_rounds::Int=10,
 
     # Set up optimization with Flux
     params = Flux.params(circ)
-    # data = repeat([()], training_rounds) # empty input data for `training_rounds` rounds of training
-    data = ncycle([()], training_rounds)
-    # optimizer = Descent(learning_rate)
+    data = repeat([()], training_rounds) # empty input data for `training_rounds` rounds of training
     optimizer = ADAM(learning_rate)
-    round = 0
+    round = 1
     expectation() = begin # evaluate expectation <f> to be minimized and print it
         ψ_out = apply(ψ, circ.moments)
         objective = objective_transform(real(ψ_out' * H_P * ψ_out))
         println("Training, round $(round): average objective = $(objective)")
         round += 1
-        return objective
+        return -objective
     end
 
     # Perform training
     Flux.train!(expectation, params, data, optimizer) #, cb=Flux.throttle(print_expectation, 1))
-
-    println("After training: <f> = $(expectation())")
-
-    circ
+    return circ
 end
 
 # Make trainable params available to Flux
