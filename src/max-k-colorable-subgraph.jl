@@ -65,7 +65,7 @@ end
         kron((color == a && vertex ∈ edge ? Z : I(2) for vertex ∈ 1:graph.n for color ∈ 1:κ)...) # Z_{u,a} Z_{v,a}
         for a ∈ 1:κ for edge ∈ graph.edges # Σ_{(u,v) = edge ∈ E} Σ_{a=1..κ}
     )
-    H_P_enc
+    return Diagonal(H_P_enc)
 end
 
 function Qaintessent.matrix(g::MaxKColSubgraphPhaseSeparationGate)
@@ -209,7 +209,7 @@ function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, tr
         circ = circ_in
     end
     ψ = ψ_initial(graph.n, κ)
-    H_P = phase_separation_hamiltonian(graph, κ)
+    H_P = Matrix(phase_separation_hamiltonian(graph, κ)) # can't have `Diagonal` matrix type here (error in backprop)
     
     # Undo the transform of HP to the objective function: f(x) |-> κm - 4 f(x). See text after Eq. (17).
     objective_transform(x) = (κ*length(graph.edges) - x)/4
