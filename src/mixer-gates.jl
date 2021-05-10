@@ -2,6 +2,7 @@ using Qaintessent
 using LinearAlgebra: I
 using Flux
 using SparseArrays: sparse
+using Memoize
 
 """
     r-nearby values single-qudit mixer gate, which acts on a single qudit
@@ -26,10 +27,9 @@ struct RNearbyValuesMixerGate <: AbstractGate
     end
 end
 
-# Implementation of Eq. (6)
-function matrix_onehot(g::RNearbyValuesMixerGate)
-    g.r == 1 || throw(DomainError("Matrix for one-hot encoding only implemented for r=1."))
-    
+@memoize function r_nearby_values_hamiltonian_onehot(g::RNearbyValuesMixerGate)
+    g.r == 1 || throw(DomainError("Hamiltonian for one-hot encoding only implemented for r=1."))
+
     X = [0 1; 1 0]
     Y = [0 -im; im 0]
 
@@ -38,7 +38,17 @@ function matrix_onehot(g::RNearbyValuesMixerGate)
         + kron((i ∈ [a, (a+1) % g.d] ? Y : I(2) for i ∈ 0:g.d-1)...)
         for a ∈ 0:g.d-1
     )
+    return H_ring_enc
+end
+
+# Implementation of Eq. (6)
+function matrix_onehot(g::RNearbyValuesMixerGate)
+    g.r == 1 || throw(DomainError("Matrix for one-hot encoding only implemented for r=1."))
+
+    H_ring_enc = r_nearby_values_hamiltonian_onehot(g)
     U_ring_enc = exp(-im * g.β[] * H_ring_enc)
+
+    return U_ring_enc
 end
 
 function matrix_qudit(g::RNearbyValuesMixerGate)

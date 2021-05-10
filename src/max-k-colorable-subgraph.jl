@@ -3,7 +3,7 @@ using Qaintellect
 using Flux
 using LinearAlgebra
 using SparseArrays: sparse
-
+using Memoize
 
 # Simple struct that represents a graph via its edges
 struct Graph
@@ -56,7 +56,7 @@ struct MaxKColSubgraphPhaseSeparationGate <: AbstractGate
     end
 end
 
-function phase_separation_hamiltonian(graph::Graph, κ::Int)
+@memoize function phase_separation_hamiltonian(graph::Graph, κ::Int)
     Z = [1 0; 0 -1]
     
     # Implementation of Eq. (17)
