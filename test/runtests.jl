@@ -3,6 +3,5 @@ using TestSetExtensions
 
 
 @testset "All the tests" begin
-    # @includetests ARGS
-    @includetests ["test_hamiltonians"]
+    @includetests ["test_adjoints", "test_gradients", "test_hamiltonians", "test_hamming_weight"]
 end

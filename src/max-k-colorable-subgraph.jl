@@ -169,7 +169,8 @@ function output_colorings_distribution_scored(circ::Circuit{N}, graph::Graph;
         include_zero = false)::Vector{Tuple{Vector{Int}, Int, Float64}} where {N}
     dist = output_colorings_distribution(circ, graph.n, include_zero = include_zero)
     
-    coloring_dict_to_list(dict) = [dict[i][1] for i ∈ 1:graph.n]
+    coloring_dict_to_list(dict) = [length(dict[i]) == 1 ? dict[i][1] : 
+        throw(ArgumentError("At least one vertex has not one unique color.")) for i ∈ 1:graph.n]
 
     return [(coloring_dict_to_list(coloring), properly_colored_edges(graph, coloring_dict_to_list(coloring)), p) for (coloring, p) ∈ dist]
 end
