@@ -215,7 +215,7 @@ function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, tr
         circ = circ_in
     end
     ψ = ψ_initial(graph.n, κ)
-    H_P = Matrix(phase_separation_hamiltonian(graph, κ)) # can't have `Diagonal` matrix type here (error in backprop)
+    H_P_diag = diag(phase_separation_hamiltonian(graph, κ)) # can't have `Diagonal` matrix type here (error in backprop)
     
     # Undo the transform of HP to the objective function: f(x) |-> κm - 4 f(x). See text after Eq. (17).
     objective_transform(x) = (κ*length(graph.edges) - x)/4
@@ -227,7 +227,7 @@ function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, tr
     round = 1
     expectation() = begin # evaluate expectation <f> to be minimized and print it
         ψ_out = apply(ψ, circ.moments)
-        objective = objective_transform(real(ψ_out' * H_P * ψ_out))
+        objective = objective_transform(real(ψ_out' * (H_P_diag .* ψ_out)))
         println("Training, round $(round): average objective = $(objective)")
         if !isnothing(logger)
             QAOAMixers.log_qaoa(logger, round, ψ_out, objective, params)
