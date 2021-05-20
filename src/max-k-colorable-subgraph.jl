@@ -43,7 +43,6 @@ Reference:\n
     Algorithms 12.2 (2019), p.34
 """
 struct MaxKColSubgraphPhaseSeparationGate <: AbstractGate 
-    # TODO possibly rename struct when this is in some module?
     # use a reference type (array with 1 entry) for compatibility with Flux
     γ::Vector{Float64} 
     κ::Int # the number of possible colors
@@ -78,10 +77,8 @@ function Qaintessent.matrix(g::MaxKColSubgraphPhaseSeparationGate)
     U_P
 end
 
-# TODO make sure this really is the correct adjoint!
 Qaintessent.adjoint(g::MaxKColSubgraphPhaseSeparationGate) = MaxKColSubgraphPhaseSeparationGate(-g.γ[], g.κ, g.graph)
 
-# TODO make sure this is the right way to do it
 function Qaintessent.backward(g::MaxKColSubgraphPhaseSeparationGate, Δ::AbstractMatrix)
     H_P_enc = phase_separation_hamiltonian(g.graph, g.κ)
 
@@ -94,7 +91,7 @@ end
 
 Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix(g))
 
-# wires
+# wires (κ * n in the one-hot encoding)
 Qaintessent.num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ * g.graph.n
 
 function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Matrix{Float64},

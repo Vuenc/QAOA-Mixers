@@ -21,8 +21,8 @@ struct RNearbyValuesMixerGate <: AbstractGate
     r::Integer # this is the r in r-Nearby-values
     d::Integer # d (= κ) = number of colors
 
-    function RNearbyValuesMixerGate(β::Real, r::Integer, d::Integer)
-        (r > 0 && d > 0) || throw(ArgumentError("Parameters r and d must be positive integers!"))
+    function RNearbyValuesMixerGate(β::Float64, r::Integer, d::Integer)
+        (r > 0 && d > 0) || throw(ArgumentError("Parameters r and d must be positive integers."))
         new([β], r, d)
     end
 end
@@ -52,19 +52,20 @@ function matrix_onehot(g::RNearbyValuesMixerGate)
 end
 
 function matrix_qudit(g::RNearbyValuesMixerGate)
-    # question: will this simulator work with qudits?
+    # Only for reference; the simulator does not work with qudits
 
     # Implementation of Eq. (A3)
     genX = I(g.d)[:,vcat(2:g.d, 1)] # move first columnn of identity matrix to back to obtain d-dim. generalized Pauli-X
     genX_T = transpose(genX)
 
-    H_rNV = sum(genX^i + genX_T^i for i ∈ 1:g.r) # TODO implement more efficiently? (avoid exponentation for each i)
+    # Implementation of H_{r-NV} qudit definition, r-NV paragraph, page 10
+    # could be implemented more efficiently (avoid exponentation for each i), but is only for reference anyway
+    H_rNV = sum(genX^i + genX_T^i for i ∈ 1:g.r)
     U_rNV = exp(-im * g.β[] * H_rNV)
 
     U_rNV
 end
 
-# TODO make sure this is the right way to do it
 function Qaintessent.backward(g::RNearbyValuesMixerGate, Δ::AbstractMatrix)
     delta = 1e-10
   
@@ -85,8 +86,7 @@ Qaintessent.adjoint(g::RNearbyValuesMixerGate) = RNearbyValuesMixerGate(-g.β[],
 
 Qaintessent.sparse_matrix(g::RNearbyValuesMixerGate) = sparse(matrix(g))
 
-# wires
-# TODO: should be d in the one-hot case, 1 for qudit case
+# wires (= g.d since we use the one-hot encoding canonically)
 Qaintessent.num_wires(g::RNearbyValuesMixerGate)::Int = g.d
 
 """
@@ -106,8 +106,8 @@ struct ParityRingMixerGate <: AbstractGate
     β::Vector{Float64}
     d::Integer # d (= κ) = number of colors
 
-    function ParityRingMixerGate(β::Real, d::Integer)
-        d > 0 || throw(ArgumentError("Parameter d must be a positive integer!"))
+    function ParityRingMixerGate(β::Float64, d::Integer)
+        d > 0 || throw(ArgumentError("Parameter d must be a positive integer."))
         new([β], d)
     end
 
@@ -137,10 +137,8 @@ function Qaintessent.matrix(g::ParityRingMixerGate)
     U_parity
 end
 
-# TODO make sure this really is the correct adjoint!
 Qaintessent.adjoint(g::ParityRingMixerGate) = ParityRingMixerGate(-g.β[], g.d)
 
-# TODO make sure this is the right way to do it
 function Qaintessent.backward(g::ParityRingMixerGate, Δ::AbstractMatrix)
     delta = 1e-10
 
@@ -154,7 +152,7 @@ end
 
 Qaintessent.sparse_matrix(g::ParityRingMixerGate) = sparse(matrix(g))
 
-# wires
+# wires (= g.d since we use the one-hot encoding canonically)
 Qaintessent.num_wires(g::ParityRingMixerGate)::Int = g.d
 
 # Make trainable params available to Flux
