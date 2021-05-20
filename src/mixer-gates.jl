@@ -120,8 +120,9 @@ function Qaintessent.matrix(g::ParityRingMixerGate)
     # Implements X_a X_{a+1} + Y_a Y_{a+1}, or more generally (⊗_{i ∈ xy_indices} X_i) + (⊗_{i ∈ xy_indices} Y_i)
     # question: what does the paper mean by X_a for a = d+1?
     XY_sum(xy_indices) = begin
-        return kron((i ∈ xy_indices ? X : I(2) for i ∈ 0:(g.d - 1))...) # passing iterator into kron via varargs syntax
-                + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 0:(g.d - 1))...)
+        # passing iterator into kron via varargs syntax
+        return kron((i ∈ xy_indices ? X : I(2) for i ∈ 0:(g.d - 1))...
+            ) + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 0:(g.d - 1))...)
     end
 
     # Implements Eq. (8)
