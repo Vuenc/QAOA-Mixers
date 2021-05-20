@@ -4,10 +4,15 @@ authors = ["Vincent Bürgin <vincent.buergin@tum.de>"]
 version = "0.1.0"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Memoize = "c03570c3-d221-55d1-a50c-7939bbd78826"
 Qaintellect = "0a7fc590-1c99-4bf9-b5a7-8c116fa99d16"
 Qaintessent = "9e6618a4-6605-11ea-2880-e931cf774ea8"
+Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 TestSetExtensions = "98d24dd4-01ad-11ea-1b02-c9a08f80db04"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"

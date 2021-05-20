@@ -98,7 +98,8 @@ Qaintessent.sparse_matrix(g::MaxKColSubgraphPhaseSeparationGate) = sparse(matrix
 Qaintessent.num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ * g.graph.n
 
 function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Matrix{Float64},
-        graph::Graph, κ::Integer)
+        graph::Graph, κ::Integer, mixer_type::Type{M}, mixer_params::Vector{<:Any}
+        ) where {M<:Union{RNearbyValuesMixerGate, ParityRingMixerGate}}
     size(βs) == (graph.n, length(γs)) || throw(ArgumentError("γs, βs have incorrect dimensions."))
     N = graph.n * κ
 
@@ -110,8 +111,12 @@ function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Matrix{Flo
 
         # Add the mixer, consisting of a partial mixer gate for each vertex
         for (vertex, β) ∈ zip(1:graph.n, βs_column)
-            # push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), ParityRingMixerGate(β, κ)))
-            push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), RNearbyValuesMixerGate(β, 1, κ)))
+            if mixer_type == RNearbyValuesMixerGate
+                gate = RNearbyValuesMixerGate(β, mixer_params[1], κ)
+            elseif mixer_type == ParityRingMixerGate
+                gate = ParityRingMixerGate(β, κ)
+            end
+            push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), gate))
         end
     end
 
@@ -190,8 +195,10 @@ function decode_basis_state(basis_state::Int, n::Int, κ::Int)::Dict{Int, Vector
 end
 
 function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, training_rounds::Int=10,
-        learning_rate::Real=0.005, circ_in::Union{Circuit{N}, Nothing}=nothing, init_stddev=0.1) where {N}
-
+        learning_rate::Float64=0.005, circ_in::Union{Circuit{N}, Nothing}=nothing, init_stddev=0.1,
+        mixer_type::Type{M}=RNearbyValuesMixerGate,  mixer_params::Vector{<:Any}=[1],
+        logger::Any=nothing) where {N, M<:Union{RNearbyValuesMixerGate, ParityRingMixerGate}}
+        
     (isnothing(circ_in) ⊻ isnothing(p)) ||
         throw(ArgumentError("Must specify exactly one of the parameters `circ_in` and `p`."))
 
@@ -202,9 +209,7 @@ function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, tr
         # Initialize circuit and wavefunction
         (initial_γs, initial_βs) = (randn(p) * init_stddev, randn((graph.n, p)) * init_stddev)
         
-        println("Initial γs: $(initial_γs)")
-        println("Initial βs: $(initial_βs)")
-        circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ)
+        circ = max_κ_colorable_subgraph_circuit(initial_γs, initial_βs, graph, κ, mixer_type, mixer_params)
     else
         N == κ * graph.n || throw(ArgumentError("Circuit `circ_in` has wrong dimensions."))
         circ = circ_in
@@ -224,6 +229,9 @@ function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, tr
         ψ_out = apply(ψ, circ.moments)
         objective = objective_transform(real(ψ_out' * H_P * ψ_out))
         println("Training, round $(round): average objective = $(objective)")
+        if !isnothing(logger)
+            QAOAMixers.log_qaoa(logger, round, ψ_out, objective, params)
+        end
         round += 1
         return -objective
     end
@@ -231,6 +239,14 @@ function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, tr
     # Perform training
     Flux.train!(expectation, params, data, optimizer) #, cb=Flux.throttle(print_expectation, 1))
     return circ
+end
+
+
+# Prototypical log function. Implementations should have the @Zygote.nograd attribute and use 
+# a data structure as first argument which can save log data.
+function log_qaoa(logger::T, ::Int, ::Vector{ComplexF64}, ::Float64, ::Any) where {T}
+    throw(ArgumentError("The type `$(T)` does not implement the `log_qaoa`
+        function and is not a valid logger."))
 end
 
 # Make trainable params available to Flux
