@@ -43,7 +43,7 @@ function run_experiments_from_file(filename::String)
         logger::Union{Nothing, QAOALogger} = nothing
         circ_out = nothing
         # repeat the experiment the specified number of times
-        for i in 1:experiment_spec.repeats
+        for i in experiment_spec.startFromRepeat:experiment_spec.repeats
             try
                 println("Running experiment $(experiment_spec.experimentId), run $(i)...")
                 # initialize the logger for this run
@@ -57,15 +57,20 @@ function run_experiments_from_file(filename::String)
                     init_stddev=experiment_spec.initStdDev, mixer_type=mixer_type, mixer_params=mixer_params,
                     logger=logger)
             catch e
+                aborted = true
                 # gracefully exit when interrupted with Ctrl+C in the REPL
                 if e isa InterruptException
                     println()
                     println("Experiment $(experiment_spec.experimentId), run $(i) interrupted!")
                 else
+                    # Have to catch other exceptions like this, because Julia
+                    # supresses the error message with a return in a finally block
+                    println()
+                    println("Fatal error occurred!")
+                    println(e)
                     rethrow()
                 end
                 println("Trying to save partial log...")
-                aborted = true
             finally                
                 # save the results (partial results at least if experiment was aborted)
                 save_log(logger, "qaoa-experiment-#$(experiment_spec.experimentId)-run-$(i)"
@@ -112,7 +117,8 @@ Zygote.@nograd function log_qaoa(logger::QAOALogger, round::Int,
     col_vecdict = map(c -> Dict("coloring" => join(c[1]), "p" => c[2]), colorings)
     push!(logger.logging_dict["coloringsByRounds"], Dict("round" => round, "colorings" => col_vecdict))
     push!(logger.logging_dict["objectiveFunctionByRounds"], Dict("round" => round, "objective" => objective))
-    push!(logger.logging_dict["gateParamsByRounds"], Dict("round" => round, "gateParams" => params.order.data))
+    push!(logger.logging_dict["gateParamsByRounds"], Dict("round" => round, 
+        "gateParams" => deepcopy(params.order.data)))
 end
 
 function save_log(logger::QAOALogger, filename::String; serialize_log::Bool=true, aborted=false)
