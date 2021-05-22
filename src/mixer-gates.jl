@@ -97,6 +97,10 @@ Qaintessent.num_wires(g::RNearbyValuesMixerGate)::Int = g.d
 ``U_{\\text{even}}(\\beta) = \\prod_{a~\\text{even}} e^{-i \\beta (X_a X_{a+1} + Y_a Y_{a+1})}``
 ``U_{\\text{last}}(\\beta) = e^{-i \\beta (X_d X_1 + Y_d Y_1)} ~\\text{if}~ d ~\\text{is odd,}~ I ~\\text{otherwise.}``
 
+The formulas require some interpretation. Assumptions for this implementation are:
+- the indices a start at 1 (not at zero like elsewhere in the paper)
+- X_{a+1} and Y_{a+1} actually means X_1 and Y_1 if a = d
+
 Reference:\n
     Stuart Hadfield, Zhihui Wang, Bryan O'Gorman, Eleanor G. Rieffel, Davide Venturelli and Rupak Biswas\n
     From the Quantum Approximate Optimization Algorithm to a Quantum Alternating Operator Ansatz\n
@@ -110,7 +114,6 @@ struct ParityRingMixerGate <: AbstractGate
         d > 0 || throw(ArgumentError("Parameter d must be a positive integer."))
         new([β], d)
     end
-
 end
 
 function Qaintessent.matrix(g::ParityRingMixerGate)
@@ -118,24 +121,24 @@ function Qaintessent.matrix(g::ParityRingMixerGate)
     Y = [0 -im; im 0]
 
     # Implements X_a X_{a+1} + Y_a Y_{a+1}, or more generally (⊗_{i ∈ xy_indices} X_i) + (⊗_{i ∈ xy_indices} Y_i)
-    # question: what does the paper mean by X_a for a = d+1?
     XY_sum(xy_indices) = begin
-        # passing iterator into kron via varargs syntax
-        return kron((i ∈ xy_indices ? X : I(2) for i ∈ 0:(g.d - 1))...
-            ) + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 0:(g.d - 1))...)
+        # passing generator into kron via varargs syntax
+        return kron((i ∈ xy_indices ? X : I(2) for i ∈ 1:g.d)...
+            ) + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 1:g.d)...)
     end
 
     # Implements Eq. (8)
-    # # question: by a ≠ n, do they actually mean a ≠ d? I assume so.
-    U_odd = prod([exp(-im * g.β[] * XY_sum([a, a+1])) for a ∈ 1:2:(g.d - 2)], init=I)
-    U_even = prod([exp(-im * g.β[] * XY_sum([a, (a+1) % g.d])) for a ∈ 0:2:(g.d - 1)], init=I)
+    # assumption: by a ≠ n, the paper actually means a ≠ d.
+    # assumption: by X_a for a = d+1, the paper means X_1.
+    U_odd = prod([exp(-im * g.β[] * XY_sum([a, a+1])) for a ∈ 1:2:(g.d - 1)], init=I)
+    U_even = prod([exp(-im * g.β[] * XY_sum([a, a < g.d ? (a+1) : 1])) for a ∈ 2:2:g.d], init=I)
 
     # Implements Eq. (9)
-    U_last =  isodd(g.d) ? exp(-im * g.β[] * XY_sum([g.d - 1, 0])) : I
+    U_last =  isodd(g.d) ? exp(-im * g.β[] * XY_sum([g.d, 1])) : I
 
     # Implements Eq. (7)
     U_parity = U_last * U_even * U_odd
-    U_parity
+    return U_parity
 end
 
 Qaintessent.adjoint(g::ParityRingMixerGate) = ParityRingMixerGate(-g.β[], g.d)
