@@ -156,6 +156,94 @@ Qaintessent.sparse_matrix(g::ParityRingMixerGate) = sparse(matrix(g))
 # wires (= g.d since we use the one-hot encoding canonically)
 Qaintessent.num_wires(g::ParityRingMixerGate)::Int = g.d
 
+"""
+    Partition single-qudit mixer gate (implemented not for qudits, but the one-hot encoding)
+
+``U_{\\mathcal{P}-r-\\text{NV}}(\\beta) = U_{P_p-\\text{XY}}(\\beta) \\dots U_{P_1-\\text{XY}}(\\beta)``
+``U_{P-\\text{XY}}(\\beta) = \\prod_{\\{a, b\\} \\in P} e^{-i \\beta (\\ket{a}\\bra{b} + \\ket{b}\\bra{a})}``
+
+Note: the time evolution term is effectively implemented with an additional factor of two in the exponent:
+``e^{-i \\beta 2 (\\ket{a}\\bra{b} + \\ket{b}\\bra{a})}``
+to be consistent with the XY gates used for the other mixers.
+
+Reference:\n
+    Stuart Hadfield, Zhihui Wang, Bryan O'Gorman, Eleanor G. Rieffel, Davide Venturelli and Rupak Biswas\n
+    From the Quantum Approximate Optimization Algorithm to a Quantum Alternating Operator Ansatz\n
+    Algorithms 12.2 (2019), equations (11) - (12), p. 12
+"""
+struct PartitionMixerGate <: AbstractGate
+    β::Vector{Float64}
+    d::Int64
+    partition::Vector{Vector{Tuple{Int, Int}}} # the Tuple stops Flux.@functor from misinterpreting these as params
+
+    function PartitionMixerGate(β::Float64, d::Int64, partition::Vector{Vector{Tuple{Int, Int}}})
+        d > 0 || throw(ArgumentError("Parameter d must be a positive integer."))
+
+        # check that no duplicate indices occur in a part (s.t. the XY mixers within one part commute)
+        for partition_part ∈ partition
+            part_indices = union(reduce(vcat, collect.(partition_part)))
+            part_indices ⊆ 1:d || throw("Indices in partition must be between 1 and d.")
+            length(part_indices) == 2 * length(partition_part) ||
+                throw("No index must occur more than once within each partition part in `partition`.")
+        end
+
+        new([β], d, partition)
+    end
+end
+
+@memoize function partition_mixer_hamiltonians(g::PartitionMixerGate)::Vector{Matrix{ComplexF64}}
+    hamiltonians = Matrix{ComplexF64}[]
+
+    X = [0 1; 1 0]
+    Y = [0 -im; im 0]
+
+    XY_sum(xy_indices) = begin
+        # passing generator into kron via varargs syntax
+        return kron((i ∈ xy_indices ? X : I(2) for i ∈ 1:g.d)...
+            ) + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 1:g.d)...)
+    end
+
+    # Implements Eqs. (11), (12)
+    # iterate through partition (in reverse to have matrix application from right to left)
+    for partition_part ∈ reverse(g.partition)
+        for (a, b) ∈ partition_part
+            push!(hamiltonians, XY_sum([a, b]))
+        end
+    end
+
+    return hamiltonians
+end
+
+# Defining this extra function allows memoizing the hamiltonians for the backward pass
+function partition_mixer_gate_matrix(g::PartitionMixerGate, β::Float64)
+    hamiltonians = partition_mixer_hamiltonians(g)
+
+    Us = exp.(-im * β * hamiltonians)
+    return prod(Us)
+end
+
+Qaintessent.matrix(g::PartitionMixerGate) = partition_mixer_gate_matrix(g, g.β[])
+
+Qaintessent.adjoint(g::PartitionMixerGate) = PartitionMixerGate(-g.β[], g.d, g.partition)
+
+function Qaintessent.backward(g::PartitionMixerGate, Δ::AbstractMatrix)
+    delta = 1e-10
+
+    U_partition1 = partition_mixer_gate_matrix(g, -(g.β[] - delta/2))
+    U_partition2 = partition_mixer_gate_matrix(g, -(g.β[] + delta/2))
+
+    U_deriv = (U_partition2 - U_partition1) / delta
+
+    return PartitionMixerGate(2 * sum(real(U_deriv .* Δ)), g.d, g.partition)
+end
+
+Qaintessent.sparse_matrix(g::PartitionMixerGate) = sparse(matrix(g))
+
+# wires (= g.d since we use the one-hot encoding canonically)
+Qaintessent.num_wires(g::PartitionMixerGate)::Int = g.d
+
+
 # Make trainable params available to Flux
 Flux.@functor ParityRingMixerGate
 Flux.@functor RNearbyValuesMixerGate
+Flux.@functor PartitionMixerGate
