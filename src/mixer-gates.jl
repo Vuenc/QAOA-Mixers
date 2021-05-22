@@ -4,6 +4,18 @@ using Flux
 using SparseArrays: sparse
 using Memoize
 
+# Pauli X and Y matrices
+X = [0 1; 1 0]
+Y = [0 -im; im 0]
+
+# Utility function for a XY mixer
+# Implements X_a X_{a+1} + Y_a Y_{a+1}, or more generally (⊗_{i ∈ xy_indices} X_i) + (⊗_{i ∈ xy_indices} Y_i)
+function XY_sum(xy_indices::Vector{Int64}, d::Int64)::Matrix{ComplexF64}
+    # passing generator into kron via varargs syntax
+    return kron((i ∈ xy_indices ? X : I(2) for i ∈ 1:d)...
+        ) + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 1:d)...)
+end
+
 """
     r-nearby values single-qudit mixer gate, which acts on a single qudit
 
@@ -117,24 +129,14 @@ struct ParityRingMixerGate <: AbstractGate
 end
 
 function Qaintessent.matrix(g::ParityRingMixerGate)
-    X = [0 1; 1 0]
-    Y = [0 -im; im 0]
-
-    # Implements X_a X_{a+1} + Y_a Y_{a+1}, or more generally (⊗_{i ∈ xy_indices} X_i) + (⊗_{i ∈ xy_indices} Y_i)
-    XY_sum(xy_indices) = begin
-        # passing generator into kron via varargs syntax
-        return kron((i ∈ xy_indices ? X : I(2) for i ∈ 1:g.d)...
-            ) + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 1:g.d)...)
-    end
-
     # Implements Eq. (8)
     # assumption: by a ≠ n, the paper actually means a ≠ d.
     # assumption: by X_a for a = d+1, the paper means X_1.
-    U_odd = prod([exp(-im * g.β[] * XY_sum([a, a+1])) for a ∈ 1:2:(g.d - 1)], init=I)
-    U_even = prod([exp(-im * g.β[] * XY_sum([a, a < g.d ? (a+1) : 1])) for a ∈ 2:2:g.d], init=I)
+    U_odd = prod([exp(-im * g.β[] * XY_sum([a, a+1], g.d)) for a ∈ 1:2:(g.d - 1)], init=I)
+    U_even = prod([exp(-im * g.β[] * XY_sum([a, a < g.d ? (a+1) : 1], g.d)) for a ∈ 2:2:g.d], init=I)
 
     # Implements Eq. (9)
-    U_last =  isodd(g.d) ? exp(-im * g.β[] * XY_sum([g.d, 1])) : I
+    U_last =  isodd(g.d) ? exp(-im * g.β[] * XY_sum([g.d, 1], g.d)) : I
 
     # Implements Eq. (7)
     U_parity = U_last * U_even * U_odd
@@ -197,20 +199,11 @@ end
 @memoize function partition_mixer_hamiltonians(g::PartitionMixerGate)::Vector{Matrix{ComplexF64}}
     hamiltonians = Matrix{ComplexF64}[]
 
-    X = [0 1; 1 0]
-    Y = [0 -im; im 0]
-
-    XY_sum(xy_indices) = begin
-        # passing generator into kron via varargs syntax
-        return kron((i ∈ xy_indices ? X : I(2) for i ∈ 1:g.d)...
-            ) + kron((i ∈ xy_indices ? Y : I(2) for i ∈ 1:g.d)...)
-    end
-
     # Implements Eqs. (11), (12)
     # iterate through partition (in reverse to have matrix application from right to left)
     for partition_part ∈ reverse(g.partition)
         for (a, b) ∈ partition_part
-            push!(hamiltonians, XY_sum([a, b]))
+            push!(hamiltonians, XY_sum([a, b], g.d))
         end
     end
 
