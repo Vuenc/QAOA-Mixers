@@ -16,11 +16,11 @@ hamming_weights(ψ) = (QAOAMixers.wavefunction_distribution(ψ)
 # with Hamming weight one)
 @testset "Hamming weight RNearbyValuesMixerGate" begin
     ds = [2, 5, 9, 10] # different numbers of colors
-    rs = [1] # currently, only r=1 supported for one-hot
+    rs = [1, 2, 5]
     nums_samples = [2, 5, 5, 5]
     
     for (d, num_samples) ∈ zip(ds, nums_samples)
-        for r ∈ rs
+        for r ∈ rs[rs .< d] # only test valid rs
             gate = QAOAMixers.RNearbyValuesMixerGate(rand() * 10 + 0.1, r, d)
             U = Qaintessent.matrix(gate)
 

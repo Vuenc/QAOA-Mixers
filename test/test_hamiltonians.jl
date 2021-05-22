@@ -39,13 +39,13 @@ right_circ_shift(l::Vector) = [l[length(l):length(l)]; l[1:length(l)-1]]
 # maps coloring states to a superposition of their neighboring states
 @testset "Hamiltonian RNearbyValuesMixerGate" begin
     ds = [2, 5, 9, 12] # different numbers of colors
-    rs = [1] # currently, only r=1 supported for one-hot
+    rs = [1, 2, 5]
     nums_samples = [2, 5, 5, 5]
 
     for (d, num_samples) ∈ zip(ds, nums_samples)
-        for r ∈ rs
+        for r ∈ rs[rs .< d] # only test valid rs
             # compute the Hamiltonian
-            gate = QAOAMixers.RNearbyValuesMixerGate(0, r, d)
+            gate = QAOAMixers.RNearbyValuesMixerGate(0., r, d)
             hamiltonian = QAOAMixers.r_nearby_values_hamiltonian_onehot(gate)
 
             # for each color (i.e. |1000..00>, |0100..00>, ..., |0000..01>):
