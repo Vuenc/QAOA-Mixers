@@ -35,32 +35,24 @@ struct RNearbyValuesMixerGate <: AbstractGate
 
     function RNearbyValuesMixerGate(β::Float64, r::Integer, d::Integer)
         (r > 0 && d > 0) || throw(ArgumentError("Parameters r and d must be positive integers."))
+        (r <= d-1) || throw(ArgumentError("Parameter d must be between 1 and d-1."))
         new([β], r, d)
     end
 end
 
 @memoize function r_nearby_values_hamiltonian_onehot(g::RNearbyValuesMixerGate)
-    g.r == 1 || throw(DomainError("Hamiltonian for one-hot encoding only implemented for r=1."))
+    H_rNV = sum(XY_sum([a, ((a + j - 1) % g.d) + 1], g.d) 
+        for a in 1:g.d for j in 1:g.r)
 
-    X = [0 1; 1 0]
-    Y = [0 -im; im 0]
-
-    H_ring_enc = sum(
-        kron((i ∈ [a, (a+1) % g.d] ? X : I(2) for i ∈ 0:g.d-1)...) # passing iterator into kron via varargs syntax
-        + kron((i ∈ [a, (a+1) % g.d] ? Y : I(2) for i ∈ 0:g.d-1)...)
-        for a ∈ 0:g.d-1
-    )
-    return H_ring_enc
+    return H_rNV
 end
 
 # Implementation of Eq. (6)
 function matrix_onehot(g::RNearbyValuesMixerGate)
-    g.r == 1 || throw(DomainError("Matrix for one-hot encoding only implemented for r=1."))
+    H_rNV = r_nearby_values_hamiltonian_onehot(g)
+    U_rNV = exp(-im * g.β[] * H_rNV)
 
-    H_ring_enc = r_nearby_values_hamiltonian_onehot(g)
-    U_ring_enc = exp(-im * g.β[] * H_ring_enc)
-
-    return U_ring_enc
+    return U_rNV
 end
 
 function matrix_qudit(g::RNearbyValuesMixerGate)
