@@ -16,7 +16,7 @@ function run_experiments_from_file(filename::String)
         graph = Graph(experiment_spec.numberOfNodes, edges)
 
         # recognize the mixer type, load arguments (like r for RNearbyValuesMixer)
-        mixer_args = experiment_spec.mixerType |> split
+        mixer_args = split(experiment_spec.mixerType)
         if mixer_args[1] == "RNearbyValuesMixer"
             length(mixer_args) == 2 || throw(ArgumentError("""RNearbyValuesMixer
                 requires r argument, e.g. "RNearbyValuesMixer 2"."""))
@@ -25,6 +25,16 @@ function run_experiments_from_file(filename::String)
         elseif mixer_args[1] == "ParityRingMixer"
             mixer_type = ParityRingMixerGate
             mixer_params = []
+        elseif mixer_args[1] == "PartitionMixer"
+            length(mixer_args) == 2 || throw(ArgumentError("""PartitionMixer requires
+                partition argument, e.g. "PartitionMixer 1-2,3-4;2-3,4-1"."""))
+            mixer_type = PartitionMixerGate
+            partition = (split(mixer_args[2], ";") 
+                .|> (partition_part -> split(partition_part, ",")
+                    .|> (t -> split(t, "-") 
+                        .|> (index -> parse(Int, index))
+                    |> Tuple)))
+            mixer_params = [partition]
         else
             throw(DomainError("""Mixer type "$(experiment_spec.mixerType)" not recognized."""))
         end

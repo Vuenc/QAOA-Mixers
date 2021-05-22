@@ -96,7 +96,7 @@ Qaintessent.num_wires(g::MaxKColSubgraphPhaseSeparationGate)::Int = g.κ * g.gra
 
 function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Matrix{Float64},
         graph::Graph, κ::Integer, mixer_type::Type{M}, mixer_params::Vector{<:Any}
-        ) where {M<:Union{RNearbyValuesMixerGate, ParityRingMixerGate}}
+        ) where {M<:Union{RNearbyValuesMixerGate, ParityRingMixerGate, PartitionMixerGate}}
     size(βs) == (graph.n, length(γs)) || throw(ArgumentError("γs, βs have incorrect dimensions."))
     N = graph.n * κ
 
@@ -112,6 +112,8 @@ function max_κ_colorable_subgraph_circuit(γs::Vector{Float64}, βs::Matrix{Flo
                 gate = RNearbyValuesMixerGate(β, mixer_params[1], κ)
             elseif mixer_type == ParityRingMixerGate
                 gate = ParityRingMixerGate(β, κ)
+            elseif mixer_type == PartitionMixerGate
+                gate = PartitionMixerGate(β, κ, mixer_params[1])
             end
             push!(gates, CircuitGate(Tuple(((vertex - 1) * κ + 1):(vertex * κ)), gate))
         end
@@ -194,7 +196,7 @@ end
 function optimize_qaoa(graph::Graph, κ::Int; p::Union{Int, Nothing}=nothing, training_rounds::Int=10,
         learning_rate::Float64=0.005, circ_in::Union{Circuit{N}, Nothing}=nothing, init_stddev=0.1,
         mixer_type::Type{M}=RNearbyValuesMixerGate,  mixer_params::Vector{<:Any}=[1],
-        logger::Any=nothing) where {N, M<:Union{RNearbyValuesMixerGate, ParityRingMixerGate}}
+        logger::Any=nothing) where {N, M<:Union{RNearbyValuesMixerGate, ParityRingMixerGate, PartitionMixerGate}}
         
     (isnothing(circ_in) ⊻ isnothing(p)) ||
         throw(ArgumentError("Must specify exactly one of the parameters `circ_in` and `p`."))
