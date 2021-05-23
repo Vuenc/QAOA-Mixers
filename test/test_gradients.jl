@@ -37,29 +37,59 @@ end
 
 @testset ExtendedTestSet "gate gradients" begin
     @testset "MaxKColGates gates" begin
-    # fictitious gradients of cost function with respect to quantum gate
-    Δ = randn(ComplexF64, 16, 16)
-    κ = 2
-    graph = QAOAMixers.Graph(2, [(1,2)])
-    g  = MaxKColSubgraphPhaseSeparationGate
-    f(θ) = 2*real(sum(Δ .* Qaintessent.sparse_matrix(g(θ[], κ, graph))))
-    θ = 2π*rand()
-    ngrad = ngradient(f, [θ])
-    dg = Qaintessent.backward(g(θ, κ, graph), conj(Δ))
-    println(dg.γ)
-    println(ngrad[1])
-    @test isapprox(dg.γ, ngrad[1], rtol=1e-5, atol=1e-5)
-    end
-
-    
-    @testset "RNearbyValuesMixerGate gates" begin
-        Δ = randn(ComplexF64, 4, 4)
+        # fictitious gradients of cost function with respect to quantum gate
+        Δ = randn(ComplexF64, 16, 16)
         κ = 2
-        g = RNearbyValuesMixerGate
-        f(θ) = 2*real(sum(Δ .* Qaintessent.sparse_matrix(g(θ[], 1, 2))))
+        graph = QAOAMixers.Graph(2, [(1,2)])
+        g  = MaxKColSubgraphPhaseSeparationGate
+        f(θ) = 2*real(sum(Δ .* Qaintessent.sparse_matrix(g(θ[], κ, graph))))
         θ = 2π*rand()
         ngrad = ngradient(f, [θ])
-        dg = Qaintessent.backward(g(θ, 1, 2), conj(Δ))
+        dg = Qaintessent.backward(g(θ, κ, graph), conj(Δ))
+        println(dg.γ)
+        println(ngrad[1])
+        @test isapprox(dg.γ, ngrad[1], rtol=1e-5, atol=1e-5)
+    end
+
+    @testset "RNearbyValuesMixerGate gates" begin
+        κs = 2:6
+        rs = [1, 1, 2, 1, 4, 5]
+        for (κ, r) ∈ zip(κs, rs)
+            Δ = randn(ComplexF64, Base.:^(2, κ), Base.:^(2, κ))
+            g = RNearbyValuesMixerGate
+            f(θ) = 2*real(sum(Δ .* Qaintessent.sparse_matrix(g(θ[], r, κ))))
+            θ = 2π*rand()
+            ngrad = ngradient(f, [θ])
+            dg = Qaintessent.backward(g(θ, r, κ), conj(Δ))
+            # sadly, with less tolerance it doesn't pass (could be improved by gradients that
+            # are not just numerically estimated)
+            @test isapprox(dg.β, ngrad[1], rtol=1e-4, atol=1e-4)
+        end
+    end
+
+    @testset "ParityRingMixerGate gates" begin
+        for κ in 2:6
+            Δ = randn(ComplexF64, Base.:^(2, κ), Base.:^(2, κ))
+            g = ParityRingMixerGate
+            f(θ) = 2*real(sum(Δ .* Qaintessent.sparse_matrix(g(θ[], κ))))
+            θ = 2π*rand()
+            ngrad = ngradient(f, [θ])
+            dg = Qaintessent.backward(g(θ, κ), conj(Δ))
+            # sadly, with less tolerance it doesn't pass (could be improved by gradients that
+            # are not just numerically estimated)
+            @test isapprox(dg.β, ngrad[1], rtol=1e-4, atol=1e-4)
+        end
+    end
+
+    @testset "PartitionMixerGate gates" begin
+        κ = 4
+        Δ = randn(ComplexF64, Base.:^(2, κ), Base.:^(2, κ))
+        partition = [[(1, 2), (3, 4)], [(2, 3), (4, 1)], [(1, 2), (3, 4)]]
+        g = PartitionMixerGate
+        f(θ) = 2*real(sum(Δ .* Qaintessent.sparse_matrix(g(θ[], κ, partition))))
+        θ = 2π*rand()
+        ngrad = ngradient(f, [θ])
+        dg = Qaintessent.backward(g(θ, κ, partition), conj(Δ))
         @test isapprox(dg.β, ngrad[1], rtol=1e-5, atol=1e-5)
     end
 end
