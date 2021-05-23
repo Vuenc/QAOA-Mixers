@@ -8,7 +8,8 @@ using LinearAlgebra
 include("mixer-gates.jl")
 export 
     RNearbyValuesMixerGate,
-    ParityRingMixerGate
+    ParityRingMixerGate,
+    PartitionMixerGate
 
 include("max-k-colorable-subgraph.jl")
 export

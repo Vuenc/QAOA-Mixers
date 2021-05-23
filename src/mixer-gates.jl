@@ -113,10 +113,11 @@ Reference:\n
 struct ParityRingMixerGate <: AbstractGate
     β::Vector{Float64}
     d::Integer # d (= κ) = number of colors
+    is_adjoint::Bool # if yes, the order in the product is reversed
 
-    function ParityRingMixerGate(β::Float64, d::Integer)
+    function ParityRingMixerGate(β::Float64, d::Integer; is_adjoint::Bool = false)
         d > 0 || throw(ArgumentError("Parameter d must be a positive integer."))
-        new([β], d)
+        new([β], d, is_adjoint)
     end
 end
 
@@ -130,12 +131,15 @@ function Qaintessent.matrix(g::ParityRingMixerGate)
     # Implements Eq. (9)
     U_last =  isodd(g.d) ? exp(-im * g.β[] * XY_sum([g.d, 1], g.d)) : I
 
-    # Implements Eq. (7)
-    U_parity = U_last * U_even * U_odd
-    return U_parity
+    # Implements Eq. (7) (U_parity)
+    if !g.is_adjoint
+        return U_last * U_even * U_odd
+    else
+        return U_odd * U_even * U_last
+    end
 end
 
-Qaintessent.adjoint(g::ParityRingMixerGate) = ParityRingMixerGate(-g.β[], g.d)
+Qaintessent.adjoint(g::ParityRingMixerGate) = ParityRingMixerGate(-g.β[], g.d, is_adjoint = !g.is_adjoint)
 
 function Qaintessent.backward(g::ParityRingMixerGate, Δ::AbstractMatrix)
     delta = 1e-10
@@ -215,7 +219,7 @@ end
 
 Qaintessent.matrix(g::PartitionMixerGate) = partition_mixer_gate_matrix(g, g.β[])
 
-Qaintessent.adjoint(g::PartitionMixerGate) = PartitionMixerGate(-g.β[], g.d, g.partition)
+Qaintessent.adjoint(g::PartitionMixerGate) = PartitionMixerGate(-g.β[], g.d, reverse(g.partition))
 
 function Qaintessent.backward(g::PartitionMixerGate, Δ::AbstractMatrix)
     delta = 1e-10
