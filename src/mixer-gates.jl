@@ -191,12 +191,13 @@ end
 @memoize function partition_mixer_hamiltonians(g::PartitionMixerGate)::Vector{Matrix{ComplexF64}}
     hamiltonians = Matrix{ComplexF64}[]
 
-    # Implements Eqs. (11), (12)
-    # iterate through partition (in reverse to have matrix application from right to left)
-    for partition_part ∈ reverse(g.partition)
-        for (a, b) ∈ partition_part
-            push!(hamiltonians, XY_sum([a, b], g.d))
-        end
+    # Implements parts of Eqs. (11), (12)
+    # iterate through partition
+    for partition_part ∈ g.partition
+        # we can represent each part by one Hamiltonian, because the individual XY gates commute
+        # and therefore exp(-iβ ∑H_{a,b}) = ∏exp(-iβ H_{a,b})
+        H_part = sum(XY_sum([a, b], g.d) for (a, b) ∈ partition_part)
+        push!(hamiltonians, H_part)
     end
 
     return hamiltonians
@@ -206,8 +207,10 @@ end
 function partition_mixer_gate_matrix(g::PartitionMixerGate, β::Float64)
     hamiltonians = partition_mixer_hamiltonians(g)
 
+    # Implements parts of Eqs. (11), (12)
+    # reverse terms in product to have matrix application from right to left
     Us = exp.(-im * β * hamiltonians)
-    return prod(Us)
+    return prod(reverse(Us))
 end
 
 Qaintessent.matrix(g::PartitionMixerGate) = partition_mixer_gate_matrix(g, g.β[])
